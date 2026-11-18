@@ -36,6 +36,11 @@ updates:
     directory: /.docker
     schedule:
       interval: weekly
+    ignore:
+      # The image's Python must match `requires-python` (and `.python-version`): moving to a new minor version is a
+      # deliberate change to all three, so only patch releases are proposed here.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     cooldown:
       default-days: 7
     commit-message:
