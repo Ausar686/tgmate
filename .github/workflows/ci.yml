@@ -62,6 +62,8 @@ jobs:
         with:
           context: .
           file: .docker/Dockerfile
+          # Re-resolve the base images every build, so a re-published tag with security fixes is what Trivy scans.
+          pull: true
           load: true
           tags: tgmate:ci
           cache-from: type=gha

@@ -26,14 +26,19 @@ volume, so the value in `.env` is ignored there.
 
 ## 3. Run
 ```bash
-docker compose up -d --build
+docker compose build --pull
+docker compose up -d
 docker compose logs -f bot
 ```
+`--pull` fetches the newest base images, so the build picks up their
+security fixes, which also re-runs the image's own `apt-get upgrade`.
 On startup the bot migrates the database, registers its command menus, and
 starts polling. It logs a warning if it can't reach the owner (step 1.2).
 
-Updating to a newer version is the same command after `git pull`;
-migrations run automatically on start.
+Updating to a newer version is the same `build --pull` and `up -d` after
+`git pull`; migrations run automatically on start. Rebuild the same way from
+time to time even without code changes, to pick up base image security
+fixes.
 
 ## 4. Use
 People write to the bot; the owner gets a DM with **Approve** / **Reject**
@@ -69,7 +74,7 @@ link and pick a tool, or use a command; see
   Docker's bridge too, and may get Docker's fallback DNS (Google), which some
   networks block. Build on the host network, then start without `--build`:
   ```bash
-  docker build --network host -f .docker/Dockerfile -t tgmate:latest .
+  docker build --network host --pull -f .docker/Dockerfile -t tgmate:latest .
   docker compose up -d
   ```
   A permanent fix is a resolver the containers can reach, e.g.

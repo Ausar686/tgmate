@@ -38,7 +38,7 @@ How the bot behaves: [src/tgmate/telegram/README.md](src/tgmate/telegram/README.
 
 ```bash
 cp .env.example .env   # bot token and owner id
-docker compose up -d --build
+docker compose build --pull && docker compose up -d
 ```
 
 Bot setup in BotFather, operations and troubleshooting are covered in
