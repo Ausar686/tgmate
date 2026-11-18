@@ -53,10 +53,10 @@ omit = ["*/__main__.py"]
 
 [tool.coverage.report]
 show_missing = true
-exclude_lines = [
-    "pragma: no cover",
+# Added to coverage's defaults (which already cover `# pragma: no cover`).
+exclude_also = [
     "raise NotImplementedError",
-    "if __name__ == .__main__.:",
+    "if __name__ == [\"']__main__[\"']:",
     "if t.TYPE_CHECKING:",
 ]
 
