@@ -37,6 +37,7 @@ def source_notice(source_url: str) -> str:
     url = html.escape(source_url, quote=True)
     return f'tgmate is free software under the AGPL-3.0-or-later: <a href="{url}">source code</a>.'
 
+
 # Revoked users aren't listed: they ask again by writing to the bot.
 _LISTED = {UserStatus.PENDING: "⏳", UserStatus.APPROVED: "✅", UserStatus.REJECTED: "🚫"}
 _OUTCOME = {UserStatus.APPROVED: "approved", UserStatus.REJECTED: "rejected", UserStatus.REVOKED: "revoked"}

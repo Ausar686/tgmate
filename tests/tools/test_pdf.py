@@ -178,7 +178,6 @@ def test_pages_render_at_the_requested_dpi(dpi: int, size: tuple[int, int]) -> N
     assert Image.open(io.BytesIO(page)).size == size
 
 
-
 def test_pages_record_their_resolution_so_a_round_trip_keeps_the_page_size() -> None:
     pdf = PDF.from_images([make_image(size=(30, 60))])
 
@@ -187,6 +186,7 @@ def test_pages_record_their_resolution_so_a_round_trip_keeps_the_page_size() -> 
     assert Image.open(io.BytesIO(pages[0])).info["dpi"] == pytest.approx((150, 150))
     # Rounding the rendered size up to whole pixels adds at most one pixel (0.48 pt at 150 dpi).
     assert pdf_pages(PDF.from_images(pages, PageSize.IMAGE)) == [pytest.approx(pdf_pages(pdf)[0], abs=0.5)]
+
 
 def test_huge_page_is_rendered_smaller(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(PDF, "MAX_RENDER_PIXELS", 100_000)
