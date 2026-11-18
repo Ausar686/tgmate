@@ -11,8 +11,8 @@ bot, with the same behavior in both.
 | Tool | What it does | Status |
 | --- | --- | --- |
 | QR code | Web address → PNG or SVG QR code | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| Images → PDF | One or more images → one PDF | Planned |
-| PDF → JPG | One JPG per page | Planned |
+| Images → PDF | One or more images → one PDF | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next |
+| PDF → JPG | One JPG per page | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next |
 | DOC(X) → PDF | Office document → PDF | Planned |
 | PDF → DOCX | PDF → editable Word document | Planned |
 | YouTube → MP3 / MP4 | Download audio or video | Planned |
