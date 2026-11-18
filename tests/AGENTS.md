@@ -22,6 +22,9 @@
   network.
 - Check generated files by reading them back (e.g. `tests/images.py`
   decodes QR codes), not just by their size or header.
+- Compare CLI usage errors and help through `tests.terminal.plain`: in CI
+  (`GITHUB_ACTIONS`) Typer styles them with ANSI codes that split words like
+  `--force`. Reproduce locally with `GITHUB_ACTIONS=true pytest`.
 - Tests must be order-independent and parallel-safe: use `tmp_path` and
   `monkeypatch`; never hit the real Telegram API, YouTube or network.
 - Name tests for the behavior under test; keep them small and focused.

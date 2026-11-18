@@ -2,6 +2,7 @@ import pytest
 from typer.testing import CliRunner
 
 from tests.images import decode_qr
+from tests.terminal import plain
 from tgmate.cli.app import app
 
 runner = CliRunner()
@@ -31,7 +32,7 @@ def test_unknown_output_suffix_is_a_usage_error(tmp_path):
     result = runner.invoke(app, ["qr", "https://example.com", "-o", "code.gif"])
 
     assert result.exit_code == 2
-    assert ".png or .svg" in result.stderr
+    assert ".png or .svg" in plain(result.stderr)
     assert not (tmp_path / "code.gif").exists()
 
 
@@ -41,7 +42,7 @@ def test_existing_output_is_kept_without_force(tmp_path):
     result = runner.invoke(app, ["qr", "https://example.com"])
 
     assert result.exit_code == 2
-    assert "--force" in result.stderr
+    assert "--force" in plain(result.stderr)
     assert (tmp_path / "qr.png").read_bytes() == b"keep me"
 
 
@@ -79,5 +80,5 @@ def test_scale_outside_the_allowed_range_is_a_usage_error():
 def test_no_arguments_shows_help():
     result = runner.invoke(app, [])
 
-    assert "qr" in result.output
-    assert "Usage" in result.output
+    assert "qr" in plain(result.output)
+    assert "Usage" in plain(result.output)
