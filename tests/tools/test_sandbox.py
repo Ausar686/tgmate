@@ -63,7 +63,7 @@ def test_a_hanging_worker_is_killed(stand_in, monkeypatch: pytest.MonkeyPatch) -
     stand_in("import time; time.sleep(60)")
 
     started = time.monotonic()
-    with pytest.raises(ToolError, match="took longer than"):
+    with pytest.raises(ToolError, match=r"^The conversion took longer than 0\.5 seconds; try a smaller file\.$"):
         run_test_operation()
 
     assert time.monotonic() - started < 5
@@ -85,16 +85,22 @@ def test_processes_the_worker_starts_are_killed_with_it(
         run_test_operation()
 
     pid = int(pid_file.read_text())
-    # Killed, then reaped by init (or left a zombie for a moment).
-    for _ in range(50):
+    assert eventually_gone(pid), f"process {pid}, started by the worker, is still running"
+
+
+def eventually_gone(pid: int) -> bool:
+    """Whether the process exits within a few seconds; a killed process may linger as a zombie until init reaps it."""
+    for _ in range(100):
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
-            break
-        time.sleep(0.05)
-    else:
+            return True
         status = pathlib.Path(f"/proc/{pid}/stat")
-        assert status.exists() and status.read_text().split()[2] == "Z"
+        # Linux shows the state after the parenthesised command name; elsewhere, wait for the process to be reaped.
+        if status.exists() and status.read_text().rsplit(")", 1)[1].split()[0] == "Z":
+            return True
+        time.sleep(0.05)
+    return False
 
 
 def test_a_crashing_worker_fails_only_the_conversion(stand_in, caplog: pytest.LogCaptureFixture) -> None:
@@ -157,7 +163,7 @@ def test_a_flooding_worker_is_stopped(stand_in, monkeypatch: pytest.MonkeyPatch,
     stand_in(f"import sys; sys.stdout.buffer.write(b'x' * 1000); sys.stdout.flush(); {script}")
 
     started = time.monotonic()
-    with pytest.raises(ToolError, match="would be over"):
+    with pytest.raises(ToolError, match=r"^The result would be over 0 MB\.$"):
         run_test_operation()
 
     assert time.monotonic() - started < 4

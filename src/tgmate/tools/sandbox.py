@@ -31,8 +31,6 @@ STDERR_TAIL_BYTES = 64 * 1024
 REAP_TIMEOUT_SECONDS = 5
 
 FAILED = "The conversion failed unexpectedly."
-TIMED_OUT = f"The conversion took longer than {TIMEOUT_SECONDS} seconds; try a smaller file."
-TOO_LARGE = f"The result would be over {MAX_OUTPUT_BYTES // (1024 * 1024)} MB."
 
 # `-I`: no PYTHON* variables, user site-packages or current directory on the import path.
 _COMMAND = (sys.executable, "-I", "-m", "tgmate.tools.worker")
@@ -137,7 +135,7 @@ def _communicate(process: subprocess.Popen[bytes], request: bytes) -> tuple[byte
         while selector.get_map():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise ToolError(TIMED_OUT)
+                raise ToolError(f"The conversion took longer than {TIMEOUT_SECONDS} seconds; try a smaller file.")
             for key, _ in selector.select(remaining):
                 if key.fileobj is process.stdin:
                     try:
@@ -157,7 +155,7 @@ def _communicate(process: subprocess.Popen[bytes], request: bytes) -> tuple[byte
                 elif key.fileobj is process.stdout:
                     stdout += chunk
                     if len(stdout) > MAX_OUTPUT_BYTES:
-                        raise ToolError(TOO_LARGE)
+                        raise ToolError(f"The result would be over {MAX_OUTPUT_BYTES // (1024 * 1024)} MB.")
                 else:
                     stderr = (stderr + chunk)[-STDERR_TAIL_BYTES:]
     return bytes(stdout), stderr
