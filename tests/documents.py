@@ -1,5 +1,6 @@
 """Builders for minimal office documents, and reading text back from PDFs."""
 
+import collections.abc as cabc
 import io
 import zipfile
 
@@ -10,7 +11,7 @@ R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationship
 IMAGE_RELATIONSHIP = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"
 
 
-def docx(text: str, *, linked_images: list[str] = ()) -> bytes:
+def docx(text: str, *, linked_images: cabc.Sequence[str] = ()) -> bytes:
     """A Word document with one paragraph of `text`, then an image linked (not embedded) from each URL."""
     images = "".join(_linked_docx_image(f"rIdImage{index}", index) for index in range(len(linked_images)))
     relationships = "".join(
@@ -62,7 +63,7 @@ def _linked_docx_image(relationship: str, index: int) -> str:
     )
 
 
-def odt(text: str, *, linked_images: list[str] = ()) -> bytes:
+def odt(text: str, *, linked_images: cabc.Sequence[str] = ()) -> bytes:
     """An OpenDocument text with one paragraph of `text`, then an image linked from each URL."""
     images = "".join(
         f'<text:p><draw:frame svg:width="2.5cm" svg:height="2.5cm" text:anchor-type="as-char">'
