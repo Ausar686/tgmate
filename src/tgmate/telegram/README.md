@@ -72,7 +72,9 @@ A photo or album with a link in its caption gets both kinds of buttons.
     `ALBUM_LIMIT` (10), or a ZIP (`report.zip`) for more. Names keep only the
     sent file's base name, so a crafted name can't put folders into the ZIP.
   - A tool's refusal (`ToolError`) is sent as the reply instead.
-- Tools run in a worker thread so the bot keeps answering meanwhile.
+- Tools run in a worker thread so the bot keeps answering meanwhile; the PDF
+  tools' work itself happens in a sandboxed process with a timeout
+  ([tools](../tools/README.md#sandbox)).
 
 | Command | Who | Does |
 | --- | --- | --- |

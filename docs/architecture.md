@@ -48,6 +48,15 @@ bot, with the same behavior in both.
 - **Images → PDF in Telegram:** one image, or one album (up to 10, Telegram's
   album limit), becomes one PDF on A4 pages. Albums are remembered in memory
   only, so their buttons stop working after a day or a restart.
+- **Sandboxing:** tool operations that parse untrusted files in Python's
+  process (PDFium and Pillow for the PDF tools) run in a separate worker
+  process with a timeout, resource limits and no environment, so a crash,
+  hang or decompression bomb fails one conversion instead of the bot, and a
+  compromised parser can't read the bot's token or make any file grow (it
+  runs as the bot's user, so it could still truncate or delete the bot's
+  files; see the tools README for what isn't covered). Tools keep
+  their synchronous API, so the CLI and the bot get the same protection
+  ([tools](../src/tgmate/tools/README.md#sandbox)).
 - **yt-dlp:** pinned and frozen; updated to the latest release only on
   request, after a breakage, and checked against the failing link.
 - **License:** MIT for now. The PR that adds PDF → DOCX moves the project to
