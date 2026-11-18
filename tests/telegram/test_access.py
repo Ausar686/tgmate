@@ -9,7 +9,7 @@ from tests.telegram.conftest import seed_user, user_status
 from tests.telegram.fake_api import FakeTelegram
 from tests.telegram.updates import USER, callback_update, command_update, member_update, update
 from tgmate.storage.models import User, UserStatus
-from tgmate.telegram.access import APPROVED, DENIED, REQUESTED, WAITING, UserAction
+from tgmate.telegram.access import APPROVED, DENIED, REQUESTED, WAITING, WRITE_TO_ASK, UserAction
 from tgmate.telegram.tools import HELP, NOT_AUTHORIZED, OWNER_HELP, LinkAction
 
 
@@ -181,22 +181,32 @@ async def test_owner_is_always_allowed_and_never_stored(
     assert await user_status(sessionmaker, OWNER) is None
 
 
-@pytest.mark.parametrize(("status", "alert"), [(UserStatus.PENDING, WAITING), (UserStatus.REJECTED, DENIED)])
-async def test_tool_buttons_refuse_users_who_are_not_approved(
+@pytest.mark.parametrize(
+    ("status", "alert"),
+    [
+        (None, WRITE_TO_ASK),
+        (UserStatus.PENDING, WAITING),
+        (UserStatus.REJECTED, DENIED),
+        (UserStatus.REVOKED, WRITE_TO_ASK),
+    ],
+)
+async def test_tool_buttons_alert_users_who_are_not_approved_without_storing_or_asking(
     dispatcher: Dispatcher,
     bot: Bot,
     telegram: FakeTelegram,
     sessionmaker: async_sessionmaker[AsyncSession],
-    status: UserStatus,
+    status: UserStatus | None,
     alert: str,
 ) -> None:
-    await seed_user(sessionmaker, USER, status)
+    if status is not None:
+        await seed_user(sessionmaker, USER, status)
 
     await dispatcher.feed_update(bot, callback_update(LinkAction(tool="qr").pack()))
 
     [answer] = telegram.calls(AnswerCallbackQuery)
     assert (answer.text, answer.show_alert) == (alert, True)
-    assert telegram.sent_texts(OWNER) == []
+    assert telegram.calls(SendMessage) == []
+    assert await user_status(sessionmaker, USER) is status
 
 
 async def test_users_lists_everyone_but_revoked_with_their_buttons(

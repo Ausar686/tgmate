@@ -28,6 +28,7 @@ ACCESS_NOTICE_INTERVAL_SECONDS = 60 * 60
 REQUESTED = "Access requested. I'll message you here once the bot owner approves it."
 WAITING = "Your access request is waiting for the bot owner's approval."
 DENIED = "This bot is private."
+WRITE_TO_ASK = "Send me a message to ask the bot owner for access."
 APPROVED = "✅ The bot owner approved your access. Send /help to see what I can do."
 
 # Revoked users aren't listed: they ask again by writing to the bot.
@@ -56,13 +57,15 @@ Handler = cabc.Callable[[TelegramObject, dict[str, t.Any]], cabc.Awaitable[objec
 
 
 async def require_access(handler: Handler, event: TelegramObject, data: dict[str, t.Any]) -> object:
-    """Let the owner and approved users through; register anyone else and ask the owner about them."""
+    """Let the owner and approved users through; register anyone else who writes and ask the owner about them."""
     settings: Settings = data["settings"]
     sender = getattr(event, "from_user", None)
     if sender is None:
         return None
     if sender.id == settings.owner_user_id:
         return await handler(event, data)
+    if isinstance(event, CallbackQuery):
+        return await _button_access(handler, event, data)
     async with data["sessionmaker"]() as session:
         user = await repo.upsert_user(session, sender.id, full_name=sender.full_name, username=sender.username)
         if user.status is UserStatus.REVOKED:
@@ -70,9 +73,6 @@ async def require_access(handler: Handler, event: TelegramObject, data: dict[str
         await session.commit()
     if user.status is UserStatus.APPROVED:
         return await handler(event, data)
-    if isinstance(event, CallbackQuery):
-        await event.answer(DENIED if user.status is UserStatus.REJECTED else WAITING, show_alert=True)
-        return None
     if user.status is UserStatus.PENDING and data["approval_requests"].ready(user.id):
         await notify_owner(data["bot"], settings, f"{describe_user(user)} asks to use the bot.", _keyboard(user))
         await event.answer(REQUESTED)
@@ -80,6 +80,18 @@ async def require_access(handler: Handler, event: TelegramObject, data: dict[str
     notices: Cooldown = data["access_notices"]
     if notices.ready(user.id):
         await event.answer(DENIED if user.status is UserStatus.REJECTED else WAITING)
+    return None
+
+
+async def _button_access(handler: Handler, query: CallbackQuery, data: dict[str, t.Any]) -> object:
+    """Let approved users' button presses through; anyone else gets an alert, and nothing is stored or asked."""
+    async with data["sessionmaker"]() as session:
+        user = await repo.get_user(session, query.from_user.id)
+    status = None if user is None else user.status
+    if status is UserStatus.APPROVED:
+        return await handler(query, data)
+    alerts = {UserStatus.PENDING: WAITING, UserStatus.REJECTED: DENIED}
+    await query.answer(alerts.get(status, WRITE_TO_ASK), show_alert=True)
     return None
 
 

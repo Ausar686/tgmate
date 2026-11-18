@@ -21,8 +21,10 @@ owner's approval; `require_access` guards every tool handler and button.
 | `approved` user | The message reaches the tools. |
 
 - Every message refreshes the user's stored name and username.
-- Tool buttons pressed by someone who isn't approved get an alert; they don't
-  register the user or ask the owner (a message does).
+- Tool buttons pressed by someone who isn't approved only get an alert
+  (waiting, private, or "send me a message" for unknown and revoked users).
+  Nothing is stored or changed and the owner isn't asked; only a message does
+  that.
 - Owner actions: Approve (the user gets a DM saying so), Reject, Revoke
   (neither tells the user). Pressed in the request DM or in `/users`, which
   lists pending, approved and rejected users with the matching buttons.
