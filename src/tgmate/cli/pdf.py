@@ -48,4 +48,4 @@ def pdf_to_jpg(
     refuse_existing(targets, force=force, param_hint="--output-dir")
     output_dir.mkdir(parents=True, exist_ok=True)
     for target, page in zip(targets, pages, strict=True):
-        write_output(target, page, force=force)
+        write_output(target, page, force=force, param_hint="--output-dir")

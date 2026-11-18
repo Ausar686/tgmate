@@ -235,3 +235,12 @@ def test_pdf_without_pages_is_refused_as_unreadable() -> None:
 
     with pytest.raises(ToolError, match="isn't a PDF I can read"):
         PDF.to_jpegs(output.getvalue())
+
+
+def test_an_enormous_page_still_records_a_valid_resolution(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Scaled down below 0.5 dpi, the recorded resolution would round to an invalid 0.
+    monkeypatch.setattr(PDF, "MAX_RENDER_PIXELS", 4)
+
+    [page] = PDF.to_jpegs(PDF.from_images([make_image(size=(30, 60))]), dpi=150)
+
+    assert Image.open(io.BytesIO(page)).info["dpi"] == pytest.approx((1, 1))

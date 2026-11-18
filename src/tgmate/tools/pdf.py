@@ -189,6 +189,7 @@ class PDF:
             page.close()
         output = io.BytesIO()
         # Records the rendered resolution, so the image prints at the page's size.
-        rendered_dpi = round(scale * POINTS_PER_INCH)
+        # At least 1: a page large enough to be scaled below 0.5 dpi would otherwise record an invalid 0.
+        rendered_dpi = max(1, round(scale * POINTS_PER_INCH))
         image.save(output, "JPEG", quality=cls.JPEG_QUALITY, optimize=True, dpi=(rendered_dpi, rendered_dpi))
         return output.getvalue()

@@ -114,3 +114,17 @@ def test_pdf_to_jpg_dpi_out_of_range_is_a_usage_error() -> None:
     result = runner.invoke(app, ["pdf-to-jpg", "a.jpg", "--dpi", "10"])
 
     assert result.exit_code == 2
+
+
+def test_a_page_file_appearing_after_the_check_names_the_output_dir(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner.invoke(app, ["images-to-pdf", "a.jpg", "-o", "doc.pdf"])
+    monkeypatch.setattr("tgmate.cli.pdf.refuse_existing", lambda *args, **kwargs: None)
+    (tmp_path / "doc-1.jpg").write_bytes(b"raced")
+
+    result = runner.invoke(app, ["pdf-to-jpg", "doc.pdf"])
+
+    assert result.exit_code == 2
+    assert "--output-dir" in plain(result.stderr)
+    assert (tmp_path / "doc-1.jpg").read_bytes() == b"raced"

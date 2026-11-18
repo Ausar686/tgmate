@@ -15,10 +15,10 @@ def refuse_existing(paths: cabc.Iterable[pathlib.Path], *, force: bool, param_hi
             raise typer.BadParameter(f"{path} already exists; pass --force to overwrite it", param_hint=param_hint)
 
 
-def write_output(path: pathlib.Path, data: bytes, *, force: bool) -> None:
+def write_output(path: pathlib.Path, data: bytes, *, force: bool, param_hint: str = "--output") -> None:
     try:
         with path.open("wb" if force else "xb") as file:
             file.write(data)
     except FileExistsError as exc:
-        raise typer.BadParameter(f"{path} already exists; pass --force to overwrite it", param_hint="--output") from exc
+        raise typer.BadParameter(f"{path} already exists; pass --force to overwrite it", param_hint=param_hint) from exc
     typer.echo(path)
