@@ -40,6 +40,7 @@ Send something, then pick what to do with it:
 | Text or a caption with a link | One per link tool (`LINK_ACTIONS`): QR code |
 | A photo, or a document with an `image/*` type | One per image tool (`FILE_ACTIONS`): PDF |
 | A document with the `application/pdf` type | One per PDF tool: JPG images |
+| A Word, ODT or RTF document (`DOCUMENT_TYPES`) | One per document tool: PDF |
 | An album of photos or images | PDF, of the whole album |
 | Anything else | None; a pointer to `/help` |
 
@@ -71,6 +72,7 @@ A photo or album with a link in its caption gets both kinds of buttons.
     `report-01.jpg`): one file, an album of up to
     `ALBUM_LIMIT` (10), or a ZIP (`report.zip`) for more. Names keep only the
     sent file's base name, so a crafted name can't put folders into the ZIP.
+  - a Word, ODT or RTF document → its PDF, named after the document;
   - A tool's refusal (`ToolError`) is sent as the reply instead.
 - Tools run in a worker thread so the bot keeps answering meanwhile; the PDF
   tools' work itself happens in a sandboxed process with a timeout

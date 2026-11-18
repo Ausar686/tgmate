@@ -18,10 +18,13 @@ from tgmate.storage.models import UserStatus
 from tgmate.telegram import files
 from tgmate.telegram.files import Albums, FileAction
 from tgmate.telegram.tools import ALBUM_GONE, ALBUM_NOT_IMAGES, NOTHING_TO_DO, PROMPT, SOURCE_GONE, LinkAction
+from tgmate.tools.errors import ToolError
+from tgmate.tools.office import Office
 from tgmate.tools.pdf import PDF
 
 RED, BLUE, GREEN = (255, 0, 0), (0, 0, 255), (0, 128, 0)
 PDF_TYPE = "application/pdf"
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +74,13 @@ def sent_document(telegram: FakeTelegram) -> tuple[str, bytes]:
 
 @pytest.mark.parametrize(
     ("kind", "expected"),
-    [("photo", [("PDF", "file:pdf:")]), ("image", [("PDF", "file:pdf:")]), ("pdf", [("JPG images", "file:jpg:")])],
+    [
+        ("photo", [("PDF", "file:pdf:")]),
+        ("image", [("PDF", "file:pdf:")]),
+        ("pdf", [("JPG images", "file:jpg:")]),
+        ("docx", [("PDF", "file:doc-pdf:")]),
+        ("rtf", [("PDF", "file:doc-pdf:")]),
+    ],
 )
 async def test_files_get_a_reply_offering_their_tools(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, kind: str, expected: list[tuple[str, str]]
@@ -80,6 +89,8 @@ async def test_files_get_a_reply_offering_their_tools(
         "photo": lambda: photo_message(telegram, make_image("JPEG")),
         "image": lambda: document_message(telegram, make_image(), "image/png", "scan.png"),
         "pdf": lambda: document_message(telegram, a_pdf(1), PDF_TYPE, "report.pdf"),
+        "docx": lambda: document_message(telegram, b"PK", DOCX_TYPE, "report.docx"),
+        "rtf": lambda: document_message(telegram, b"{\\rtf1}", "text/rtf", "notes.rtf"),
     }[kind]()
 
     await dispatcher.feed_update(bot, update(**message))
@@ -265,6 +276,62 @@ async def test_upload_limit_applies_to_each_page_not_the_album(
 
     assert len(telegram.calls(SendMediaGroup)) == int(sent)
     assert [text.startswith("The result is") for text in telegram.sent_texts(USER)] == ([] if sent else [True])
+
+
+# --- office documents → PDF ---
+
+
+@pytest.fixture
+def converted(monkeypatch: pytest.MonkeyPatch) -> list[bytes]:
+    """Fakes LibreOffice (tested with the tool): records each document and returns a stand-in PDF."""
+    documents: list[bytes] = []
+
+    def to_pdf(data: bytes) -> bytes:
+        documents.append(data)
+        return b"%PDF-converted"
+
+    monkeypatch.setattr(Office, "to_pdf", staticmethod(to_pdf))
+    return documents
+
+
+@pytest.mark.parametrize(("file_name", "expected"), [("report.docx", "report.pdf"), (None, "document.pdf")])
+async def test_document_button_replies_with_the_pdf(
+    dispatcher: Dispatcher,
+    bot: Bot,
+    telegram: FakeTelegram,
+    converted: list[bytes],
+    file_name: str | None,
+    expected: str,
+) -> None:
+    await press(dispatcher, bot, "doc-pdf", document_message(telegram, b"the document", DOCX_TYPE, file_name))
+
+    filename, pdf = sent_document(telegram)
+    assert (filename, pdf) == (expected, b"%PDF-converted")
+    assert converted == [b"the document"]
+
+
+async def test_document_the_tool_refuses_gets_its_reason(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(data: bytes) -> bytes:
+        raise ToolError("LibreOffice couldn't open this DOCX document; it may be damaged.")
+
+    monkeypatch.setattr(Office, "to_pdf", staticmethod(refuse))
+
+    await press(dispatcher, bot, "doc-pdf", document_message(telegram, b"broken", DOCX_TYPE, "report.docx"))
+
+    assert telegram.sent_texts(USER) == ["LibreOffice couldn&#x27;t open this DOCX document; it may be damaged."]
+    assert telegram.calls(SendDocument) == []
+
+
+async def test_document_button_on_an_image_alerts(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, converted: list[bytes]
+) -> None:
+    await press(dispatcher, bot, "doc-pdf", photo_message(telegram, make_image("JPEG")))
+
+    [answer] = telegram.calls(AnswerCallbackQuery)
+    assert answer.text == SOURCE_GONE
+    assert converted == []
 
 
 # --- buttons whose file is gone or doesn't fit ---

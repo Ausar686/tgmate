@@ -14,6 +14,7 @@ import signal
 import struct
 import subprocess  # nosec B404
 import sys
+import tempfile
 import time
 import typing as t
 
@@ -46,8 +47,17 @@ class Result(t.NamedTuple):
     stderr: bytes
 
 
-def run(operation: str, inputs: t.Sequence[bytes], options: Options, outputs: range) -> list[bytes]:
-    """The blobs the worker's `operation` returns for `inputs`; raises `ToolError` for anything but a clean result."""
+def run(
+    operation: str, inputs: t.Sequence[bytes], options: Options, outputs: range, *, workdir: bool = False
+) -> list[bytes]:
+    """The blobs the worker's `operation` returns for `inputs`; raises `ToolError` for anything but a clean result.
+
+    With `workdir`, the operation also gets an empty directory as the `workdir` option. The caller creates and removes
+    it, so it's cleaned up even when the worker is killed.
+    """
+    if workdir:
+        with tempfile.TemporaryDirectory(prefix="tgmate-") as directory:
+            return run(operation, inputs, {**options, "workdir": directory}, outputs)
     result = _execute(encode_request(operation, options, inputs))
     if result.returncode == TOOL_ERROR_STATUS:
         raise ToolError(result.stderr.decode(errors="replace")[:ERROR_CHARS])

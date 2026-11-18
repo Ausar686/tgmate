@@ -16,6 +16,7 @@ from aiogram.types import BufferedInputFile, InputMediaDocument, Message
 from aiogram.utils.chat_action import ChatActionSender
 
 from tgmate.tools.errors import ToolError
+from tgmate.tools.office import Office
 from tgmate.tools.pdf import PDF
 
 MB = 1024 * 1024
@@ -33,6 +34,17 @@ ALBUM_TTL_SECONDS = 24 * 60 * 60
 class Kind(enum.StrEnum):
     IMAGE = "image"
     PDF = "pdf"
+    DOCUMENT = "document"
+
+
+# The types Telegram clients give Word, OpenDocument text and RTF files; the tool checks the content itself.
+DOCUMENT_TYPES = {
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/msword",
+    "application/vnd.oasis.opendocument.text",
+    "application/rtf",
+    "text/rtf",
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -51,12 +63,16 @@ class FileAction(CallbackData, prefix="file"):
 
 
 # (button text, tool) for every action that takes a file of that kind; a new file tool adds its row here.
-FILE_ACTIONS = {Kind.IMAGE: [("PDF", "pdf")], Kind.PDF: [("JPG images", "jpg")]}
+FILE_ACTIONS = {
+    Kind.IMAGE: [("PDF", "pdf")],
+    Kind.PDF: [("JPG images", "jpg")],
+    Kind.DOCUMENT: [("PDF", "doc-pdf")],
+}
 TOOL_KINDS = {tool: kind for kind, actions in FILE_ACTIONS.items() for _, tool in actions}
 
 
 def attachment(message: Message) -> Attachment | None:
-    """The message's image (a photo at its largest size, or an image document) or PDF document, if it has one."""
+    """The message's image (a photo at its largest size, or an image document), PDF or office document, if any."""
     if message.photo:
         largest = message.photo[-1]
         return Attachment(Kind.IMAGE, largest.file_id, largest.file_size, None)
@@ -67,6 +83,8 @@ def attachment(message: Message) -> Attachment | None:
         kind = Kind.PDF
     elif document.mime_type.startswith("image/"):
         kind = Kind.IMAGE
+    elif document.mime_type in DOCUMENT_TYPES:
+        kind = Kind.DOCUMENT
     else:
         return None
     return Attachment(kind, document.file_id, document.file_size, document.file_name)
@@ -145,6 +163,19 @@ async def send_pdf(bot: Bot, source: Message, images: list[Attachment]) -> None:
             await source.reply(html.escape(str(exc)))
             return
         await source.reply_document(BufferedInputFile(pdf, f"{stem(images[0].name, 'images')}.pdf"))
+
+
+async def send_document_pdf(bot: Bot, source: Message, document: Attachment) -> None:
+    """Reply to `source` with the office document as a PDF, or with why it can't be converted."""
+    async with ChatActionSender.upload_document(source.chat.id, bot):
+        try:
+            check_downloadable([document])
+            pdf = await asyncio.to_thread(Office.to_pdf, await download(bot, document))
+            check_sendable(len(pdf))
+        except ToolError as exc:
+            await source.reply(html.escape(str(exc)))
+            return
+        await source.reply_document(BufferedInputFile(pdf, f"{stem(document.name, 'document')}.pdf"))
 
 
 async def send_jpegs(bot: Bot, source: Message, pdf: Attachment) -> None:

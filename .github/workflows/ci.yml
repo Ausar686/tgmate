@@ -33,6 +33,12 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --locked
+      # The office tests convert real documents. They skip without LibreOffice, but not in CI, so a failed install
+      # fails them instead of hiding them. Same packages as the Docker image.
+      - name: Install LibreOffice
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes --no-install-recommends
+          libreoffice-writer-nogui fonts-liberation fonts-crosextra-carlito fonts-crosextra-caladea fonts-dejavu-core
       - run: uv run coverage run -m pytest
       - run: uv run coverage report
 
@@ -80,6 +86,11 @@ jobs:
           out = io.BytesIO(); Image.new('RGB', (60, 90), 'red').save(out, 'PNG');
           pdf = PDF.from_images([out.getvalue()] * 2);
           assert PDF.page_count(pdf) == 2 and len(PDF.to_jpegs(pdf)) == 2"
+      - name: Convert a document to PDF with LibreOffice inside the image
+        run: >-
+          docker run --rm tgmate:ci python -c
+          "from tgmate.tools.office import Office;
+          assert Office.to_pdf(rb'{\rtf1\ansi Hello\par}').startswith(b'%PDF-')"
       - name: Scan the image for fixable high/critical vulnerabilities
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2

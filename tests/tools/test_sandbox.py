@@ -31,7 +31,8 @@ def stand_in(monkeypatch: pytest.MonkeyPatch) -> object:
 
 def wrapped_worker(operation: str) -> str:
     """A script running the real worker `main` with one extra operation, `test`, defined by `operation`."""
-    return f"from tgmate.tools import worker\n{operation}\nworker.OPERATIONS['test'] = test\nworker.main()"
+    register = "worker.OPERATIONS['test'] = worker.Operation(test)"
+    return f"from tgmate.tools import worker\n{operation}\n{register}\nworker.main()"
 
 
 def run_test_operation() -> list[bytes]:
@@ -211,8 +212,16 @@ def test_running_out_of_memory_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> 
     def exhausting(inputs: list[bytes]) -> list[bytes]:
         raise MemoryError
 
-    monkeypatch.setitem(worker.OPERATIONS, "test", exhausting)
+    monkeypatch.setitem(worker.OPERATIONS, "test", worker.Operation(exhausting))
 
     result = worker.handle(sandbox.encode_request("test", {}, []))
 
     assert result == (sandbox.TOOL_ERROR_STATUS, b"", worker.OUT_OF_MEMORY.encode())
+
+
+def test_the_limits_before_the_request_allow_every_operations_limits() -> None:
+    for operation in worker.OPERATIONS.values():
+        assert operation.limits.memory_bytes <= worker.LOOSEST_LIMITS.memory_bytes
+        assert operation.limits.file_bytes <= worker.LOOSEST_LIMITS.file_bytes
+        assert operation.limits.open_files <= worker.LOOSEST_LIMITS.open_files
+    assert worker.LOOSEST_LIMITS.open_files == 1024
