@@ -1,0 +1,10 @@
+# Allowlist: only what the image build needs.
+*
+!pyproject.toml
+!uv.lock
+!LICENSE
+!src/
+**/__pycache__
+# Module READMEs and agent notes stay out; the root README is the package's `readme`.
+**/*.md
+!README.md

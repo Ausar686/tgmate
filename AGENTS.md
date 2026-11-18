@@ -80,8 +80,16 @@ narration, or dated TODOs. Match the comment density of neighboring code.
     the single source of env variable names and defaults (template:
     [.env.example](.env.example)).
 - [tests/](tests) — pytest suite. **See [tests/AGENTS.md](tests/AGENTS.md).**
-- [.github/](.github) — CI (lint, tests, security scans) and Dependabot
-  (weekly `uv` and GitHub Actions updates).
+- [.docker/](.docker) + [docker-compose.yaml](docker-compose.yaml) — the bot's
+  image (uv two-stage build on Debian slim, no pip, non-root, `/data`
+  volume) and its compose service, built locally. CI builds the image,
+  migrates a database inside it and fails on fixable high/critical CVEs
+  (Trivy). Running it: [docs/deployment.md](docs/deployment.md).
+  `.dockerignore` is an allowlist, so new top-level files the build needs
+  must be added there.
+- [.github/](.github) — CI (lint, tests, security scans, Docker image) and
+  Dependabot (weekly `uv`, pre-commit hook, base image and GitHub Actions
+  updates).
 - [.claude/](.claude) — agent tooling: settings and skills. `.agents/skills`
   and `.cursor/skills` are symlinks to `.claude/skills` so Codex and Cursor
   share the same skills.

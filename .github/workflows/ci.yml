@@ -51,3 +51,29 @@ jobs:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - run: uv run pre-commit run semgrep --hook-stage manual --all-files
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: .docker/Dockerfile
+          # Re-resolve the base images every build, so a re-published tag with security fixes is what Trivy scans.
+          pull: true
+          load: true
+          tags: tgmate:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Migrate a fresh database inside the image
+        run: >-
+          docker run --rm tgmate:ci python -c
+          "import asyncio; from tgmate.storage import db;
+          asyncio.run(db.upgrade(db.create_engine('sqlite+aiosqlite:////data/tgmate.db')))"
+      - name: Scan the image for fixable high/critical vulnerabilities
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2
+          image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 tgmate:ci
