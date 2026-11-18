@@ -22,10 +22,13 @@ implementation (the `_`-prefixed method).
   path) and its own process group, killed with everything it started once
   the operation ends or fails.
 - **Limits:** `sandbox.TIMEOUT_SECONDS` of wall-clock time; in the worker,
-  `worker.MEMORY_LIMIT_BYTES` of address space (Linux only: macOS refuses
-  it), CPU time a little over the timeout, a file size limit of 0 (no write
-  can make a file grow) and few open files. At most `sandbox.MAX_OUTPUT_BYTES`
-  of results are read back.
+  CPU time a little over the timeout and the operation's `worker.Limits`:
+  address space (Linux only: macOS refuses it), file size and open files. By
+  default the file size limit is 0 (no write can make a file grow); an
+  operation that runs a program needing files (LibreOffice) raises it and
+  asks `sandbox.run(..., workdir=True)` for an empty directory, which the
+  caller creates and removes even when the worker is killed. At most
+  `sandbox.MAX_OUTPUT_BYTES` of results are read back.
 - **Not covered:** the worker runs as the caller's user, so code that
   exploits a parser could still truncate or delete that user's files (the
   bot's database, in the Docker image) and open network connections. Closing
@@ -38,6 +41,27 @@ implementation (the `_`-prefixed method).
   oversized result is a `ToolError` saying so. Anything else (a crash, a bug,
   malformed output) is logged with the end of the worker's stderr and
   reported as "The conversion failed unexpectedly."
+
+## Office documents ([office.py](office.py))
+`Office.to_pdf(document) -> bytes`: a DOCX, DOC, ODT or RTF document as a
+PDF, converted by LibreOffice (`soffice`, found on `PATH` or in the macOS
+app), which runs inside the [sandbox](#sandbox) worker.
+- **Format** is read from the content (OLE2 signature for DOC, `{\rtf` for
+  RTF, the ZIP's parts for DOCX and ODT), never from the name, and
+  LibreOffice is told to open the file only as that format. Anything else is
+  refused before LibreOffice starts. DOCX and ODT are ZIP archives, refused
+  above `MAX_ARCHIVE_ENTRIES` parts or `MAX_UNPACKED_BYTES` unpacked.
+- **Isolation:** every conversion gets a fresh LibreOffice profile and home
+  in the job's directory, and nothing from the user reaches the command line
+  (the file is saved as `document.<format>`). By default LibreOffice fetches
+  images a document links to on the web and embeds linked local files, so
+  the profile blocks untrusted links; it also points the proxy at a closed
+  port and disables macros and active content.
+- **Refused** with `ToolError`: other formats, archives over the limits, a
+  document LibreOffice can't open, and LibreOffice not being installed.
+- **Not covered:** fonts a document uses but the system lacks are replaced
+  (the Docker image has Word's metric-compatible fonts and DejaVu, not CJK
+  fonts), so layouts can differ from Word's.
 
 ## QR code ([qr.py](qr.py))
 `QRCode.from_url(url, fmt=PNG, scale=10) -> bytes` returns the image.

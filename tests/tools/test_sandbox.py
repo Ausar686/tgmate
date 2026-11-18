@@ -31,7 +31,8 @@ def stand_in(monkeypatch: pytest.MonkeyPatch) -> object:
 
 def wrapped_worker(operation: str) -> str:
     """A script running the real worker `main` with one extra operation, `test`, defined by `operation`."""
-    return f"from tgmate.tools import worker\n{operation}\nworker.OPERATIONS['test'] = test\nworker.main()"
+    register = "worker.OPERATIONS['test'] = worker.Operation(test)"
+    return f"from tgmate.tools import worker\n{operation}\n{register}\nworker.main()"
 
 
 def run_test_operation() -> list[bytes]:
@@ -211,7 +212,7 @@ def test_running_out_of_memory_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> 
     def exhausting(inputs: list[bytes]) -> list[bytes]:
         raise MemoryError
 
-    monkeypatch.setitem(worker.OPERATIONS, "test", exhausting)
+    monkeypatch.setitem(worker.OPERATIONS, "test", worker.Operation(exhausting))
 
     result = worker.handle(sandbox.encode_request("test", {}, []))
 

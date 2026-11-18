@@ -10,6 +10,7 @@ arguments, calls the tool and writes the result.
 | `tgmate qr URL [-o qr.png] [--scale N] [-f]` | Writes a QR code for `URL`; the output's suffix (`.png` / `.svg`) picks the format | [qr.py](qr.py) |
 | `tgmate images-to-pdf IMAGE... [-o NAME.pdf] [--page-size a4\|letter\|image] [-f]` | Combines images into one PDF, one page each; named after the first image by default | [pdf.py](pdf.py) |
 | `tgmate pdf-to-jpg PDF [-o DIR] [--dpi 150] [-f]` | Writes each page as `DIR/<name>-<n>.jpg`, numbers zero-padded to sort in order | [pdf.py](pdf.py) |
+| `tgmate doc-to-pdf DOCUMENT [-o NAME.pdf] [-f]` | Converts a DOCX, DOC, ODT or RTF document to PDF with LibreOffice (which must be installed); named after the document, in the current folder, by default | [office.py](office.py) |
 
 `tgmate --help` and `tgmate <command> --help` list every option.
 

@@ -13,7 +13,7 @@ bot, with the same behavior in both.
 | QR code | Web address → PNG or SVG QR code | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | Images → PDF | One or more images → one PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| DOC(X) → PDF | Office document → PDF | Planned |
+| DOC(X) → PDF | Word, ODT or RTF document → PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → DOCX | PDF → editable Word document | Planned |
 | YouTube → MP3 / MP4 | Download audio or video | Planned |
 
@@ -57,6 +57,12 @@ bot, with the same behavior in both.
   files; see the tools README for what isn't covered). Tools keep
   their synchronous API, so the CLI and the bot get the same protection
   ([tools](../src/tgmate/tools/README.md#sandbox)).
+- **Documents → PDF:** LibreOffice (headless Writer, from Debian's
+  packages) converts DOCX, DOC, ODT and RTF; it's the only free converter
+  with good Word fidelity. It runs inside the sandbox worker with a fresh
+  profile per job that blocks linked web and local content, and it roughly
+  doubles the Docker image (about 920 MB). Outside Docker it must be
+  installed separately; the tool says so when it's missing.
 - **yt-dlp:** pinned and frozen; updated to the latest release only on
   request, after a breakage, and checked against the failing link.
 - **License:** MIT for now. The PR that adds PDF → DOCX moves the project to

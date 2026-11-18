@@ -5,7 +5,7 @@ import typing as t
 
 import typer
 
-from tgmate.cli import pdf, qr
+from tgmate.cli import office, pdf, qr
 from tgmate.tools.errors import ToolError
 
 app = typer.Typer(no_args_is_help=True, add_completion=False, pretty_exceptions_show_locals=False)
@@ -13,7 +13,7 @@ app = typer.Typer(no_args_is_help=True, add_completion=False, pretty_exceptions_
 
 @app.callback()
 def tgmate() -> None:
-    """Everyday tools: QR codes, images to PDF and PDF to JPG."""
+    """Everyday tools: QR codes, images to PDF, PDF to JPG and documents to PDF."""
 
 
 def reports_errors[**P](command: t.Callable[P, None]) -> t.Callable[P, None]:
@@ -33,3 +33,4 @@ def reports_errors[**P](command: t.Callable[P, None]) -> t.Callable[P, None]:
 app.command()(reports_errors(qr.qr))
 app.command()(reports_errors(pdf.images_to_pdf))
 app.command()(reports_errors(pdf.pdf_to_jpg))
+app.command()(reports_errors(office.doc_to_pdf))

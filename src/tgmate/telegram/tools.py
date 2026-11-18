@@ -22,6 +22,7 @@ from tgmate.telegram.files import (
     Kind,
     attachment,
     check_downloadable,
+    send_document_pdf,
     send_jpegs,
     send_pdf,
 )
@@ -37,13 +38,15 @@ HELP = (
     "• a link → <b>QR code</b>: an image that opens the link when scanned\n"
     "• photos or images, one or an album → <b>PDF</b>: one page per image\n"
     "• a PDF → <b>JPG images</b>: one per page, as a ZIP above 10 pages\n"
+    "• a Word (DOCX, DOC), ODT or RTF document → <b>PDF</b>\n"
     f"I take files up to {DOWNLOAD_LIMIT // MB} MB.\n\n"
     "Or use a command:\n"
     "/qr &lt;link&gt; — QR code for a link"
 )
 OWNER_HELP = "\n/users — approve or revoke users"
 NOTHING_TO_DO = (
-    "I don't know what to do with this yet. Send me a link, an image or a PDF, or /help to see what I can do."
+    "I don't know what to do with this yet. Send me a link, an image, a PDF or a document, "
+    "or /help to see what I can do."
 )
 PROMPT = "What should I do with this?"
 SOURCE_GONE = "I can't see the original message anymore; send it again."
@@ -171,6 +174,8 @@ async def run_file_action(query: CallbackQuery, callback_data: FileAction, album
             await send_pdf(bot, source, files)
         case "jpg":
             await send_jpegs(bot, source, files[0])
+        case "doc-pdf":
+            await send_document_pdf(bot, source, files[0])
 
 
 async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> None:
