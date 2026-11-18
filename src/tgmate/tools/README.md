@@ -55,3 +55,6 @@ order.
 
 `PDF.page_count(pdf) -> int`: how many images `to_jpegs` would return, without
 rendering, and refusing the same PDFs; lets a caller check its outputs first.
+
+`PDF.jpeg_names(stem, count) -> list[str]`: the file names front ends give
+the pages, `<stem>-1.jpg` onwards, zero-padded to sort in page order.

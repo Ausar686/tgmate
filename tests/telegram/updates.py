@@ -57,6 +57,22 @@ def update(text: str | None = None, *, update_id: int = 1, **kwargs: t.Any) -> U
     return Update.model_validate({"update_id": update_id, "message": message_data(text, **kwargs)})
 
 
+def photo(file_id: str, size: int, width: int = 40, height: int = 20) -> list[dict[str, t.Any]]:
+    """A photo's sizes as Telegram sends them, smallest first; the largest has `file_id`, the thumbnail its own."""
+    thumbnail = {"file_id": f"{file_id}-thumb", "file_unique_id": "t", "width": 4, "height": 2, "file_size": 100}
+    largest = {"file_id": file_id, "file_unique_id": "p", "width": width, "height": height, "file_size": size}
+    return [thumbnail, largest]
+
+
+def document(file_id: str, size: int, mime_type: str | None, file_name: str | None = None) -> dict[str, t.Any]:
+    data: dict[str, t.Any] = {"file_id": file_id, "file_unique_id": "d", "file_size": size}
+    if mime_type is not None:
+        data["mime_type"] = mime_type
+    if file_name is not None:
+        data["file_name"] = file_name
+    return data
+
+
 def link_update(text: str, link: str, **kwargs: t.Any) -> Update:
     """A message whose `link` Telegram marked up as a URL."""
     return update(text, entities=[url_entity(text, link)], **kwargs)

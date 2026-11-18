@@ -3,15 +3,28 @@
 import asyncio
 import html
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.enums import MessageEntityType
 from aiogram.filters import Command, CommandObject
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup, Message
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from tgmate.config import Settings
 from tgmate.telegram.access import require_access
+from tgmate.telegram.files import (
+    DOWNLOAD_LIMIT,
+    FILE_ACTIONS,
+    MB,
+    TOOL_KINDS,
+    Albums,
+    Attachment,
+    FileAction,
+    Kind,
+    attachment,
+    check_downloadable,
+    send_jpegs,
+    send_pdf,
+)
 from tgmate.tools.errors import ToolError
 from tgmate.tools.qr import QRCode
 
@@ -20,14 +33,22 @@ from tgmate.tools.qr import QRCode
 CAPTION_LIMIT = 1024
 
 HELP = (
-    "Send me a link and pick what to do with it:\n"
-    "• <b>QR code</b>: an image that opens the link when scanned\n\n"
+    "Send me something and pick what to do with it:\n"
+    "• a link → <b>QR code</b>: an image that opens the link when scanned\n"
+    "• photos or images, one or an album → <b>PDF</b>: one page per image\n"
+    "• a PDF → <b>JPG images</b>: one per page, as a ZIP above 10 pages\n"
+    f"I take files up to {DOWNLOAD_LIMIT // MB} MB.\n\n"
     "Or use a command:\n"
     "/qr &lt;link&gt; — QR code for a link"
 )
 OWNER_HELP = "\n/users — approve or revoke users"
-NOTHING_TO_DO = "I don't know what to do with this yet. Send me a link, or /help to see what I can do."
-SOURCE_GONE = "I can't see the original message anymore; send the link again."
+NOTHING_TO_DO = (
+    "I don't know what to do with this yet. Send me a link, an image or a PDF, or /help to see what I can do."
+)
+PROMPT = "What should I do with this?"
+SOURCE_GONE = "I can't see the original message anymore; send it again."
+ALBUM_GONE = "I no longer have this album; send it again."
+ALBUM_NOT_IMAGES = "I can only turn an album of images into a PDF; send PDFs and other files one at a time."
 NOT_AUTHORIZED = "You are not authorized to use this command."
 
 
@@ -48,9 +69,10 @@ def build_tools_router() -> Router:
     router.message.register(qr_command, Command("qr"))
     # The owner's /users is handled by the access router first; here it only meets approved users.
     router.message.register(not_authorized, Command("users"))
-    router.message.register(offer_link_actions, has_link)
-    router.message.register(nothing_to_do)
+    router.message.register(offer_album_actions, F.media_group_id)
+    router.message.register(offer_actions)
     router.callback_query.register(run_link_action, LinkAction.filter())
+    router.callback_query.register(run_file_action, FileAction.filter())
     return router
 
 
@@ -65,34 +87,90 @@ def first_link(message: Message) -> str | None:
     return None
 
 
-def has_link(message: Message) -> dict[str, str] | bool:
-    link = first_link(message)
-    return {"link": link} if link else False
-
-
 async def show_help(message: Message, settings: Settings) -> None:
     owner = message.from_user is not None and message.from_user.id == settings.owner_user_id
     await message.answer(HELP + (OWNER_HELP if owner else ""))
-
-
-async def nothing_to_do(message: Message) -> None:
-    await message.reply(NOTHING_TO_DO)
 
 
 async def not_authorized(message: Message) -> None:
     await message.reply(NOT_AUTHORIZED)
 
 
-def _link_actions_keyboard() -> InlineKeyboardMarkup:
-    keyboard = InlineKeyboardBuilder()
-    for text, tool in LINK_ACTIONS:
-        keyboard.button(text=text, callback_data=LinkAction(tool=tool))
-    return keyboard.as_markup()
+def _buttons(message: Message, files: list[Attachment], album: str = "") -> list[InlineKeyboardButton]:
+    """Buttons for the tools that take these files, then for the link tools if the message has a link."""
+    buttons = [
+        InlineKeyboardButton(text=text, callback_data=FileAction(tool=tool, album=album).pack())
+        for text, tool in (FILE_ACTIONS[files[0].kind] if files else [])
+    ]
+    if first_link(message) is not None:
+        buttons += [
+            InlineKeyboardButton(text=text, callback_data=LinkAction(tool=tool).pack()) for text, tool in LINK_ACTIONS
+        ]
+    return buttons
 
 
-async def offer_link_actions(message: Message, link: str) -> None:
-    # The prompt replies to the user's message, so the button handler reads the link back from it.
-    await message.reply("What should I do with this link?", reply_markup=_link_actions_keyboard())
+async def offer_actions(message: Message) -> None:
+    # The prompt replies to the user's message, so the button handlers read the link or file back from it.
+    file = attachment(message)
+    files = [file] if file is not None else []
+    try:
+        check_downloadable(files)
+    except ToolError as exc:
+        await message.reply(html.escape(str(exc)))
+        return
+    buttons = _buttons(message, files)
+    if not buttons:
+        await message.reply(NOTHING_TO_DO)
+        return
+    await message.reply(PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]))
+
+
+async def offer_album_actions(message: Message, albums: Albums) -> None:
+    album = await albums.collect(message)
+    if album is None:
+        return
+    first = album[0]
+    files = [attachment(album_message) for album_message in album]
+    if any(file is None or file.kind is not Kind.IMAGE for file in files):
+        await first.reply(ALBUM_NOT_IMAGES)
+        return
+    try:
+        check_downloadable(files)
+    except ToolError as exc:
+        await first.reply(html.escape(str(exc)))
+        return
+    # The prompt can reply to only one of the album's messages, so the buttons carry a token for all its files.
+    token = albums.keep(message.chat.id, files)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[_buttons(first, files, token)])
+    await first.reply(f"What should I do with these {len(files)} images?", reply_markup=keyboard)
+
+
+async def run_file_action(query: CallbackQuery, callback_data: FileAction, albums: Albums, bot: Bot) -> None:
+    kind = TOOL_KINDS.get(callback_data.tool)
+    if kind is None:
+        await query.answer()
+        return
+    gone = ALBUM_GONE if callback_data.album else SOURCE_GONE
+    prompt = query.message
+    # Results reply to the user's message, so without it (an old prompt, or one Telegram no longer shows) nothing runs.
+    source = prompt.reply_to_message if isinstance(prompt, Message) else None
+    if source is None:
+        await query.answer(gone, show_alert=True)
+        return
+    if callback_data.album:
+        files = albums.get(source.chat.id, callback_data.album)
+    else:
+        file = attachment(source)
+        files = [file] if file is not None else None
+    if not files or any(file.kind is not kind for file in files):
+        await query.answer(gone, show_alert=True)
+        return
+    await query.answer()
+    match callback_data.tool:
+        case "pdf":
+            await send_pdf(bot, source, files)
+        case "jpg":
+            await send_jpegs(bot, source, files[0])
 
 
 async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> None:

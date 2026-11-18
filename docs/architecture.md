@@ -11,8 +11,8 @@ bot, with the same behavior in both.
 | Tool | What it does | Status |
 | --- | --- | --- |
 | QR code | Web address → PNG or SVG QR code | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| Images → PDF | One or more images → one PDF | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next |
-| PDF → JPG | One JPG per page | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next |
+| Images → PDF | One or more images → one PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
+| PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | DOC(X) → PDF | Office document → PDF | Planned |
 | PDF → DOCX | PDF → editable Word document | Planned |
 | YouTube → MP3 / MP4 | Download audio or video | Planned |
@@ -42,8 +42,12 @@ bot, with the same behavior in both.
   (receives up to 20 MB, sends up to 50 MB) and refuses larger files with a
   clear message. The YouTube PR moves it to a self-hosted Bot API server
   (receives files of any size, sends up to 2 GB).
-- **PDF → JPG in Telegram:** up to 10 pages are sent as an album; more pages
-  are sent as one ZIP.
+- **PDF → JPG in Telegram:** up to 10 pages are sent as an album of JPEG
+  files (documents, not photos, which Telegram would shrink and recompress);
+  more pages are sent as one ZIP.
+- **Images → PDF in Telegram:** one image, or one album (up to 10, Telegram's
+  album limit), becomes one PDF on A4 pages. Albums are remembered in memory
+  only, so their buttons stop working after a day or a restart.
 - **yt-dlp:** pinned and frozen; updated to the latest release only on
   request, after a breakage, and checked against the failing link.
 - **License:** MIT for now. The PR that adds PDF → DOCX moves the project to

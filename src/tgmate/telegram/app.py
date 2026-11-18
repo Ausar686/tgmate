@@ -15,6 +15,7 @@ from tgmate.telegram.access import (
     build_access_router,
 )
 from tgmate.telegram.cooldown import Cooldown
+from tgmate.telegram.files import Albums
 from tgmate.telegram.setup import prepare_bot
 from tgmate.telegram.tools import build_tools_router
 
@@ -23,6 +24,7 @@ def build_dispatcher(**context: object) -> Dispatcher:
     dispatcher = Dispatcher(
         approval_requests=Cooldown(APPROVAL_REQUEST_INTERVAL_SECONDS),
         access_notices=Cooldown(ACCESS_NOTICE_INTERVAL_SECONDS),
+        albums=Albums(),
     )
     # Access first: the owner's /users and approval buttons must not reach the tools' catch-all handler.
     dispatcher.include_routers(build_access_router(), build_tools_router())

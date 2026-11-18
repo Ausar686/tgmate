@@ -275,3 +275,13 @@ def test_page_count_refuses_too_many_pages(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(ToolError, match="3 pages; the limit is 2"):
         PDF.page_count(pdf)
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"), [(1, ["scan-1.jpg"]), (10, ["scan-01.jpg", "scan-02.jpg"])]
+)
+def test_jpeg_names_are_padded_to_sort_in_page_order(count: int, expected: list[str]) -> None:
+    names = PDF.jpeg_names("scan", count)
+
+    assert names[: len(expected)] == expected
+    assert len(names) == count and names[-1] == f"scan-{count}.jpg"
