@@ -15,7 +15,8 @@ from tgmate.telegram.access import require_access
 from tgmate.tools.errors import ToolError
 from tgmate.tools.qr import QRCode
 
-# Telegram's limit for a photo caption, in characters.
+# Telegram's limit for a photo caption, counted after HTML parsing (`&amp;` is one character), so the plain text
+# is cut before escaping, which also keeps the cut out of escape sequences.
 CAPTION_LIMIT = 1024
 
 HELP = (
