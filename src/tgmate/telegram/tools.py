@@ -27,6 +27,7 @@ HELP = (
 OWNER_HELP = "\n/users — approve or revoke users"
 NOTHING_TO_DO = "I don't know what to do with this yet. Send me a link, or /help to see what I can do."
 SOURCE_GONE = "I can't see the original message anymore; send the link again."
+NOT_AUTHORIZED = "You are not authorized to use this command."
 
 
 class LinkAction(CallbackData, prefix="link"):
@@ -44,6 +45,8 @@ def build_tools_router() -> Router:
     router.callback_query.middleware(require_access)
     router.message.register(show_help, Command("start", "help"))
     router.message.register(qr_command, Command("qr"))
+    # The owner's /users is handled by the access router first; here it only meets approved users.
+    router.message.register(not_authorized, Command("users"))
     router.message.register(offer_link_actions, has_link)
     router.message.register(nothing_to_do)
     router.callback_query.register(run_link_action, LinkAction.filter())
@@ -73,6 +76,10 @@ async def show_help(message: Message, settings: Settings) -> None:
 
 async def nothing_to_do(message: Message) -> None:
     await message.reply(NOTHING_TO_DO)
+
+
+async def not_authorized(message: Message) -> None:
+    await message.reply(NOT_AUTHORIZED)
 
 
 def _link_actions_keyboard() -> InlineKeyboardMarkup:

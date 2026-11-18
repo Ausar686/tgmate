@@ -50,7 +50,7 @@ Send something, then pick what to do with it:
 | --- | --- | --- |
 | `/start`, `/help` | everyone approved | What the bot can do (the owner also sees `/users`) |
 | `/qr <link>` | everyone approved | QR code for the link |
-| `/users` | owner | Lists users with Approve / Reject / Revoke buttons |
+| `/users` | owner | Lists users with Approve / Reject / Revoke buttons. Approved users get "You are not authorized to use this command."; anyone not approved only goes through the access flow above, so outsiders learn nothing about the commands |
 
 Command menus are set at startup ([setup.py](setup.py)): the owner's includes
 `/users`.

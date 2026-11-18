@@ -10,7 +10,7 @@ from tests.telegram.fake_api import FakeTelegram
 from tests.telegram.updates import USER, callback_update, command_update, member_update, update
 from tgmate.storage.models import User, UserStatus
 from tgmate.telegram.access import APPROVED, DENIED, REQUESTED, WAITING, UserAction
-from tgmate.telegram.tools import HELP, OWNER_HELP, LinkAction
+from tgmate.telegram.tools import HELP, NOT_AUTHORIZED, OWNER_HELP, LinkAction
 
 
 def forbidden(method: type) -> TelegramForbiddenError:
@@ -231,7 +231,19 @@ async def test_users_with_nobody_to_list(dispatcher: Dispatcher, bot: Bot, teleg
     assert telegram.sent_texts(OWNER) == ["No pending, approved or rejected users."]
 
 
-async def test_users_command_from_anyone_else_is_an_ordinary_message(
+async def test_users_command_is_refused_to_approved_users_without_listing_anyone(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, sessionmaker: async_sessionmaker[AsyncSession]
+) -> None:
+    await seed_user(sessionmaker, USER, UserStatus.APPROVED)
+    await seed_user(sessionmaker, 3, UserStatus.PENDING, full_name="Cat")
+
+    await dispatcher.feed_update(bot, command_update("/users"))
+
+    assert telegram.sent_texts(USER) == [NOT_AUTHORIZED]
+    assert len(telegram.calls(SendMessage)) == 1
+
+
+async def test_users_command_from_someone_not_approved_only_requests_access(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:
     await dispatcher.feed_update(bot, command_update("/users"))
