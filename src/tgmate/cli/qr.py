@@ -5,6 +5,7 @@ import typing as t
 
 import typer
 
+from tgmate.cli.files import write_output
 from tgmate.tools.qr import ImageFormat, QRCode
 
 
@@ -23,11 +24,4 @@ def qr(
         fmt = ImageFormat(output.suffix.lower().removeprefix("."))
     except ValueError as exc:
         raise typer.BadParameter("must end in .png or .svg", param_hint="--output") from exc
-    image = QRCode.from_url(url, fmt, scale)
-    try:
-        with output.open("wb" if force else "xb") as file:
-            file.write(image)
-    except FileExistsError as exc:
-        message = f"{output} already exists; pass --force to overwrite it"
-        raise typer.BadParameter(message, param_hint="--output") from exc
-    typer.echo(output)
+    write_output(output, QRCode.from_url(url, fmt, scale), force=force)
