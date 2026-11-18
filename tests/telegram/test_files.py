@@ -6,7 +6,7 @@ import zipfile
 import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.methods import AnswerCallbackQuery, SendDocument, SendMediaGroup, SendMessage
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import Chat, InaccessibleMessage, InlineKeyboardMarkup
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -420,6 +420,22 @@ async def test_album_button_the_bot_no_longer_remembers_asks_to_send_it_again(
 
     [answer] = telegram.calls(AnswerCallbackQuery)
     assert (answer.text, answer.show_alert) == (ALBUM_GONE, True)
+
+
+async def test_album_button_on_a_prompt_telegram_no_longer_shows_asks_to_send_it_again(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, albums: Albums
+) -> None:
+    token = albums.keep(USER, [files.Attachment(files.Kind.IMAGE, "img", 10, None)])
+    pressed = callback_update(FileAction(tool="pdf", album=token).pack())
+    # Telegram sends prompts older than 48 hours as inaccessible messages: only the chat and id, nothing to reply to.
+    inaccessible = InaccessibleMessage(chat=Chat(id=USER, type="private"), message_id=77, date=0)
+    query = pressed.callback_query.model_copy(update={"message": inaccessible})
+
+    await dispatcher.feed_update(bot, pressed.model_copy(update={"callback_query": query}))
+
+    [answer] = telegram.calls(AnswerCallbackQuery)
+    assert (answer.text, answer.show_alert) == (ALBUM_GONE, True)
+    assert telegram.calls(SendDocument) == []
 
 
 async def test_album_button_only_works_in_the_chat_it_was_offered_in(albums: Albums) -> None:

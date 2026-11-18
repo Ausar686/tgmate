@@ -150,16 +150,19 @@ async def run_file_action(query: CallbackQuery, callback_data: FileAction, album
     if kind is None:
         await query.answer()
         return
+    gone = ALBUM_GONE if callback_data.album else SOURCE_GONE
     prompt = query.message
+    # Results reply to the user's message, so without it (an old prompt, or one Telegram no longer shows) nothing runs.
     source = prompt.reply_to_message if isinstance(prompt, Message) else None
+    if source is None:
+        await query.answer(gone, show_alert=True)
+        return
     if callback_data.album:
-        files = albums.get(prompt.chat.id, callback_data.album) if prompt is not None else None
-        gone = ALBUM_GONE
+        files = albums.get(source.chat.id, callback_data.album)
     else:
-        file = attachment(source) if source is not None else None
+        file = attachment(source)
         files = [file] if file is not None else None
-        gone = SOURCE_GONE
-    if source is None or not files or any(file.kind is not kind for file in files):
+    if not files or any(file.kind is not kind for file in files):
         await query.answer(gone, show_alert=True)
         return
     await query.answer()

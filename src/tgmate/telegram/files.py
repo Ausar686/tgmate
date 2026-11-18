@@ -161,10 +161,11 @@ async def send_jpegs(bot: Bot, source: Message, pdf: Attachment) -> None:
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
-        documents = [BufferedInputFile(data, filename) for filename, data in files.items()]
         if archive is not None:
             await source.reply_document(BufferedInputFile(archive, f"{name}.zip"))
-        elif len(documents) == 1:
+            return
+        documents = [BufferedInputFile(data, filename) for filename, data in files.items()]
+        if len(documents) == 1:
             await source.reply_document(documents[0])
         else:
             await source.reply_media_group([InputMediaDocument(media=document) for document in documents])
