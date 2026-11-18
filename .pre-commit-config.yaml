@@ -12,6 +12,17 @@ repos:
       - id: debug-statements
       - id: mixed-line-ending
 
+  # semgrep runs in pre-commit's own environment rather than the project venv: its pinned dependencies (mcp,
+  # opentelemetry) would otherwise sit in uv.lock and raise alerts we can't fix. Manual stage: CI runs it, commits
+  # don't wait for it.
+  - repo: https://github.com/semgrep/pre-commit
+    rev: v1.186.0
+    hooks:
+      - id: semgrep
+        args: ["--config", ".semgrep.yml", "--error", "--disable-version-check", "--quiet", "--skip-unknown-extensions"]
+        files: ^src/
+        stages: [manual]
+
   - repo: local
     hooks:
       - id: ruff

@@ -17,6 +17,20 @@ updates:
       dev:
         dependency-type: development
 
+  # Hook revisions in .pre-commit-config.yaml, including semgrep's.
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      hooks:
+        patterns: ["*"]
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

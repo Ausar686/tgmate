@@ -46,4 +46,8 @@ jobs:
           enable-cache: true
       - run: uv sync --locked
       - run: uv run bandit -c pyproject.toml -r src --severity-level medium
-      - run: uv run semgrep scan --config .semgrep.yml --error src
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - run: uv run pre-commit run semgrep --hook-stage manual --all-files
