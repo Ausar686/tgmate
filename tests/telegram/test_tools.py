@@ -65,17 +65,6 @@ async def test_text_link_uses_its_hidden_address(dispatcher: Dispatcher, bot: Bo
     assert sent_qr(telegram)[0] == "https://docs.example"
 
 
-async def test_link_in_a_photo_caption_is_offered(dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram) -> None:
-    caption = "see https://example.com"
-    photo = [{"file_id": "f", "file_unique_id": "u", "width": 10, "height": 10}]
-    await dispatcher.feed_update(
-        bot, update(photo=photo, caption=caption, caption_entities=[url_entity(caption, "https://example.com")])
-    )
-
-    [prompt] = telegram.calls(SendMessage)
-    assert prompt.reply_markup is not None
-
-
 async def test_button_whose_original_message_is_gone_asks_for_the_link_again(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:

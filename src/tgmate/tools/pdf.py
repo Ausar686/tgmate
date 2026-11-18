@@ -83,6 +83,12 @@ class PDF:
         finally:
             document.close()
 
+    @staticmethod
+    def jpeg_names(stem: str, count: int) -> list[str]:
+        """File names for `count` pages: `<stem>-1.jpg`, …, zero-padded so they sort in page order."""
+        digits = len(str(count))
+        return [f"{stem}-{number:0{digits}d}.jpg" for number in range(1, count + 1)]
+
     @classmethod
     def _open_pdf(cls, data: bytes) -> pdfium.PdfDocument:
         """The loaded PDF, after checking it isn't encrypted or too long; refuses anything else with `ToolError`."""

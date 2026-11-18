@@ -43,9 +43,7 @@ def pdf_to_jpg(
 ) -> None:
     """Save each page of a PDF as a JPEG: <name>-1.jpg, <name>-2.jpg, …"""
     data = pdf.read_bytes()
-    count = PDF.page_count(data)
-    digits = len(str(count))
-    targets = [output_dir / f"{pdf.stem}-{number:0{digits}d}.jpg" for number in range(1, count + 1)]
+    targets = [output_dir / name for name in PDF.jpeg_names(pdf.stem, PDF.page_count(data))]
     # Before rendering, which can take a while for a long PDF at a high DPI.
     refuse_existing(targets, force=force, param_hint="--output-dir")
     pages = PDF.to_jpegs(data, dpi)

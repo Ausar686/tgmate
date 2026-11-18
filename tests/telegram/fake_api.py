@@ -4,8 +4,17 @@ import typing as t
 
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
-from aiogram.methods import GetChat, GetMe, SendMessage, SendPhoto, TelegramMethod
-from aiogram.types import ChatFullInfo, Message, User
+from aiogram.methods import (
+    GetChat,
+    GetFile,
+    GetMe,
+    SendDocument,
+    SendMediaGroup,
+    SendMessage,
+    SendPhoto,
+    TelegramMethod,
+)
+from aiogram.types import ChatFullInfo, File, Message, User
 
 
 class FakeTelegram(BaseSession):
@@ -16,6 +25,8 @@ class FakeTelegram(BaseSession):
         self.requests: list[TelegramMethod] = []
         # A list of errors is consumed one per call, so a call can fail N times and then succeed.
         self.errors: dict[type[TelegramMethod], Exception | list[Exception]] = {}
+        # Downloadable files by file id.
+        self.files: dict[str, bytes] = {}
         self._message_ids = itertools.count(1000)
 
     def calls(self, method: type[TelegramMethod]) -> list[t.Any]:
@@ -51,15 +62,33 @@ class FakeTelegram(BaseSession):
                     "photo": [{"file_id": f"photo-{message_id}", "file_unique_id": "p", "width": 330, "height": 330}],
                 }
             )
+        if isinstance(method, SendDocument):
+            return self._document_message(method.chat_id, method.document.filename)
+        if isinstance(method, SendMediaGroup):
+            return [self._document_message(method.chat_id, item.media.filename) for item in method.media]
+        if isinstance(method, GetFile):
+            data = self.files[method.file_id]
+            return File(file_id=method.file_id, file_unique_id="u", file_size=len(data), file_path=method.file_id)
         if isinstance(method, GetMe):
             return User(id=42, is_bot=True, first_name="tgmate", username="tgmate_bot")
         if isinstance(method, GetChat):
             return ChatFullInfo.model_construct(id=method.chat_id, type="private")
         return True
 
-    async def stream_content(self, *args: t.Any, **kwargs: t.Any) -> cabc.AsyncGenerator[bytes]:
-        raise NotImplementedError
-        yield b""
+    def _document_message(self, chat_id: int | str, filename: str | None) -> Message:
+        message_id = next(self._message_ids)
+        return Message.model_validate(
+            {
+                "message_id": message_id,
+                "date": 0,
+                "chat": {"id": chat_id, "type": "private"},
+                "document": {"file_id": f"document-{message_id}", "file_unique_id": "d", "file_name": filename},
+            }
+        )
+
+    async def stream_content(self, url: str, *args: t.Any, **kwargs: t.Any) -> cabc.AsyncGenerator[bytes]:
+        # The file path GetFile returned (the file id) ends the download URL.
+        yield self.files[url.rsplit("/", 1)[1]]
 
     async def close(self) -> None:
         return None
