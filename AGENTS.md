@@ -31,7 +31,9 @@ exposed through several front ends: a CLI and a Telegram bot.
 - Quick tests: `pytest -q`
 - Lint (including import order): `ruff check .`; autofix with `ruff check --fix .`
 - Security: `bandit -c pyproject.toml -r src --severity-level medium` and
-  `semgrep scan --config .semgrep.yml --error src`
+  `pre-commit run semgrep --hook-stage manual --all-files` (semgrep is not a
+  project dependency: pre-commit installs it in its own environment, so its
+  pinned dependencies stay out of `uv.lock`)
 - Git hooks: `pre-commit install` once; `pre-commit run --all-files` on demand.
 
 ## Code style & conventions

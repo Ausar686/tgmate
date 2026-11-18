@@ -46,7 +46,7 @@ uv run pytest -q
 uv run coverage run -m pytest && uv run coverage report
 uv run ruff check .
 uv run bandit -c pyproject.toml -r src --severity-level medium
-uv run semgrep scan --config .semgrep.yml --error src
+uv run pre-commit run semgrep --hook-stage manual --all-files
 uv run pre-commit install
 ```
 
@@ -58,7 +58,7 @@ After changing dependencies: `uv lock && uv sync`.
 | `pytest`, `pytest-asyncio` | Tests | `[tool.pytest.ini_options]` |
 | `coverage` | Test coverage | `[tool.coverage.*]` |
 | `bandit` | Security scanning | `[tool.bandit]` |
-| `semgrep` | Pattern-based scanning | `.semgrep.yml` |
+| `semgrep` | Pattern-based scanning (own environment, via pre-commit) | `.semgrep.yml`; version in `.pre-commit-config.yaml` |
 | `pre-commit` | Git hooks | `.pre-commit-config.yaml` |
 
 CI (`.github/workflows/ci.yml`) runs lint, tests and security scans on pull
