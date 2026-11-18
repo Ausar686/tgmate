@@ -1,0 +1,51 @@
+import asyncio
+
+import sqlalchemy as sa
+from alembic import context
+
+from tgmate.config import DatabaseSettings
+from tgmate.storage import db
+from tgmate.storage.models import Base
+
+config = context.config
+target_metadata = Base.metadata
+
+
+def _configure(**kwargs: object) -> None:
+    context.configure(target_metadata=target_metadata, render_as_batch=True, **kwargs)
+
+
+def run_migrations_offline() -> None:
+    url = DatabaseSettings().database_url.get_secret_value()
+    _configure(url=url, literal_binds=True, dialect_opts={"paramstyle": "named"})
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+def do_run_migrations(connection: sa.Connection) -> None:
+    _configure(connection=connection)
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    engine = db.create_engine(DatabaseSettings().database_url.get_secret_value())
+    async with engine.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+        await connection.commit()
+    await engine.dispose()
+
+
+def run_migrations_online() -> None:
+    # The bot passes its own connection (see storage.db.upgrade) because it already runs an event loop.
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        do_run_migrations(connection)
+    else:
+        asyncio.run(run_async_migrations())
+
+
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
+    run_migrations_online()

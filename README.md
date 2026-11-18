@@ -14,6 +14,26 @@ Commands are listed in [src/tgmate/cli/README.md](src/tgmate/cli/README.md);
 planned tools and product decisions are in
 [docs/architecture.md](docs/architecture.md).
 
+### Telegram bot
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
+   Optionally turn off *Allow Groups* there (the bot leaves groups anyway).
+2. Find your numeric Telegram user id (e.g. with
+   [@userinfobot](https://t.me/userinfobot)).
+3. Configure and start it:
+
+   ```bash
+   cp .env.example .env   # set TELEGRAM_BOT_TOKEN and OWNER_USER_ID
+   uv run python -m tgmate.telegram
+   ```
+
+4. Send `/start` to the bot from your account, so it can DM you approval
+   requests. Other people write to the bot, and you approve them from the DM
+   or from `/users`.
+
+The database (`data/tgmate.db` by default) is created and migrated on start.
+How the bot behaves: [src/tgmate/telegram/README.md](src/tgmate/telegram/README.md).
+
 ## Repository layout
 
 | Path | Purpose |
@@ -21,6 +41,7 @@ planned tools and product decisions are in
 | `src/tgmate/tools/` | The tools, independent of any front end |
 | `src/tgmate/cli/` | Command-line front end |
 | `src/tgmate/telegram/` | Telegram bot front end |
+| `src/tgmate/storage/` | The bot's SQLite database and migrations |
 | `tests/` | pytest suite |
 | `docs/` | Architecture and product decisions |
 | `.github/` | CI workflow and Dependabot config |

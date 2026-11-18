@@ -71,7 +71,14 @@ narration, or dated TODOs. Match the comment density of neighboring code.
     (`README.md`).
   - [cli/](src/tgmate/cli) — the `tgmate` command (Typer); run with
     `uv run tgmate --help` (`README.md`).
-  - [telegram/](src/tgmate/telegram) — Telegram bot front end (not built yet).
+  - [telegram/](src/tgmate/telegram) — the Telegram bot (aiogram): owner
+    approval of users, tool buttons and commands; run with
+    `uv run python -m tgmate.telegram` (`README.md`).
+  - [storage/](src/tgmate/storage) — SQLite schema, query helpers and Alembic
+    migrations for the bot (`README.md`).
+  - [config.py](src/tgmate/config.py) — the bot's `Settings` from env/`.env`;
+    the single source of env variable names and defaults (template:
+    [.env.example](.env.example)).
 - [tests/](tests) — pytest suite. **See [tests/AGENTS.md](tests/AGENTS.md).**
 - [.github/](.github) — CI (lint, tests, security scans) and Dependabot
   (weekly `uv` and GitHub Actions updates).
