@@ -1,0 +1,22 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: .docker/Dockerfile
+    image: tgmate:latest
+    env_file: .env
+    environment:
+      # The database must live on the volume, whatever .env says.
+      DATABASE_URL: sqlite+aiosqlite:////data/tgmate.db
+    volumes:
+      - data:/data
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  data:

@@ -34,6 +34,16 @@ planned tools and product decisions are in
 The database (`data/tgmate.db` by default) is created and migrated on start.
 How the bot behaves: [src/tgmate/telegram/README.md](src/tgmate/telegram/README.md).
 
+## Deployment
+
+```bash
+cp .env.example .env   # bot token and owner id
+docker compose up -d --build
+```
+
+Bot setup in BotFather, operations and troubleshooting are covered in
+[docs/deployment.md](docs/deployment.md).
+
 ## Repository layout
 
 | Path | Purpose |
@@ -43,7 +53,8 @@ How the bot behaves: [src/tgmate/telegram/README.md](src/tgmate/telegram/README.
 | `src/tgmate/telegram/` | Telegram bot front end |
 | `src/tgmate/storage/` | The bot's SQLite database and migrations |
 | `tests/` | pytest suite |
-| `docs/` | Architecture and product decisions |
+| `docs/` | Architecture, product decisions and deployment |
+| `.docker/`, `docker-compose.yaml`, `.dockerignore` | The bot's container image and compose service |
 | `.github/` | CI workflow and Dependabot config |
 | `.claude/` | Agent settings and skills (`.agents/skills`, `.cursor/skills` link here) |
 | `AGENTS.md` (+ nested) | Agent instructions; each `CLAUDE.md` imports its sibling `AGENTS.md` |
@@ -82,8 +93,8 @@ After changing dependencies: `uv lock && uv sync`.
 | `semgrep` | Pattern-based scanning (own environment, via pre-commit) | `.semgrep.yml`; version in `.pre-commit-config.yaml` |
 | `pre-commit` | Git hooks | `.pre-commit-config.yaml` |
 
-CI (`.github/workflows/ci.yml`) runs lint, tests and security scans on pull
-requests and pushes to `main`. Dependabot (`.github/dependabot.yml`) opens
+CI (`.github/workflows/ci.yml`) runs lint, tests, security scans and a Docker
+image build with a vulnerability scan on pull requests and pushes to `main`. Dependabot (`.github/dependabot.yml`) opens
 weekly update PRs for dependencies and GitHub Actions.
 
 ## Contributing
