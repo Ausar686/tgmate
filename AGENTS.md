@@ -6,7 +6,9 @@ exposed through several front ends: a CLI and a Telegram bot.
 ## Project overview
 - Package: [src/tgmate/](src/tgmate). **See [src/tgmate/AGENTS.md](src/tgmate/AGENTS.md).**
 - Runtime: Python 3.14 (`requires-python` in [pyproject.toml](pyproject.toml)).
-- Status: scaffolding only — no runtime code yet.
+- Product decisions (tools, front ends, Telegram access and limits, licensing):
+  **see [docs/architecture.md](docs/architecture.md)** — read it before
+  changing behavior and update it when a decision changes.
 
 ## Environment & setup
 - Dependency manager: `uv`; lock file `uv.lock`. The project is a src-layout
@@ -63,9 +65,11 @@ narration, or dated TODOs. Match the comment density of neighboring code.
 
 ## Architecture map
 - [src/tgmate/](src/tgmate) — the application package.
-  - [tools/](src/tgmate/tools) — the tools themselves, front-end agnostic.
-  - [cli/](src/tgmate/cli) — command-line front end.
-  - [telegram/](src/tgmate/telegram) — Telegram bot front end.
+  - [tools/](src/tgmate/tools) — the tools themselves, front-end agnostic
+    (`README.md`).
+  - [cli/](src/tgmate/cli) — the `tgmate` command (Typer); run with
+    `uv run tgmate --help` (`README.md`).
+  - [telegram/](src/tgmate/telegram) — Telegram bot front end (not built yet).
 - [tests/](tests) — pytest suite. **See [tests/AGENTS.md](tests/AGENTS.md).**
 - [.github/](.github) — CI (lint, tests, security scans) and Dependabot
   (weekly `uv` and GitHub Actions updates).

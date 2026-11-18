@@ -2,6 +2,18 @@
 
 Everyday tools with CLI & Telegram integration.
 
+## Usage
+
+```bash
+uv sync
+uv run tgmate qr example.com -o qr.png   # QR code for https://example.com
+uv run tgmate --help                      # all commands
+```
+
+Commands are listed in [src/tgmate/cli/README.md](src/tgmate/cli/README.md);
+planned tools and product decisions are in
+[docs/architecture.md](docs/architecture.md).
+
 ## Repository layout
 
 | Path | Purpose |
@@ -10,6 +22,7 @@ Everyday tools with CLI & Telegram integration.
 | `src/tgmate/cli/` | Command-line front end |
 | `src/tgmate/telegram/` | Telegram bot front end |
 | `tests/` | pytest suite |
+| `docs/` | Architecture and product decisions |
 | `.github/` | CI workflow and Dependabot config |
 | `.claude/` | Agent settings and skills (`.agents/skills`, `.cursor/skills` link here) |
 | `AGENTS.md` (+ nested) | Agent instructions; each `CLAUDE.md` imports its sibling `AGENTS.md` |
