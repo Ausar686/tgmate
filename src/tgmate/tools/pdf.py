@@ -9,6 +9,7 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_raw
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from tgmate.tools import sandbox
 from tgmate.tools.errors import ToolError
 
 POINTS_PER_INCH = 72
@@ -27,7 +28,7 @@ PAPER_SIZES = {PageSize.A4: (595.28, 841.89), PageSize.LETTER: (612.0, 792.0)}
 
 
 class PDF:
-    """Builds a PDF from images and renders a PDF's pages as JPEG images."""
+    """Builds a PDF from images and renders a PDF's pages as JPEG images, each in a sandboxed process."""
 
     MAX_IMAGES = 100
     # Checked before decoding, so a small file that unpacks into a huge image (a decompression bomb) is refused.
@@ -49,6 +50,32 @@ class PDF:
     @classmethod
     def from_images(cls, images: cabc.Sequence[bytes], page_size: PageSize = PageSize.A4) -> bytes:
         """Return a PDF with one page per image, in order, each fitted and centred on its page."""
+        [pdf] = sandbox.run("pdf.from_images", images, {"page_size": page_size.value}, outputs=range(1, 2))
+        return pdf
+
+    @classmethod
+    def to_jpegs(cls, data: bytes, dpi: int = DEFAULT_DPI) -> list[bytes]:
+        """Return one JPEG per page of the PDF, in order, rendered at `dpi`."""
+        return sandbox.run("pdf.to_jpegs", [data], {"dpi": dpi}, outputs=range(1, cls.MAX_PAGES + 1))
+
+    @classmethod
+    def page_count(cls, data: bytes) -> int:
+        """The number of pages `to_jpegs` would return, without rendering; refuses the same PDFs."""
+        [count] = sandbox.run("pdf.page_count", [data], {}, outputs=range(1, 2))
+        if not count.isdigit():
+            raise ToolError(sandbox.FAILED)
+        return int(count)
+
+    @staticmethod
+    def jpeg_names(stem: str, count: int) -> list[str]:
+        """File names for `count` pages: `<stem>-1.jpg`, …, zero-padded so they sort in page order."""
+        digits = len(str(count))
+        return [f"{stem}-{number:0{digits}d}.jpg" for number in range(1, count + 1)]
+
+    # The operations themselves, run in this process by the sandbox's worker; untrusted input never reaches them here.
+
+    @classmethod
+    def _from_images(cls, images: cabc.Sequence[bytes], page_size: PageSize) -> bytes:
         if not images:
             raise ToolError("Give at least one image.")
         if len(images) > cls.MAX_IMAGES:
@@ -64,8 +91,7 @@ class PDF:
         return output.getvalue()
 
     @classmethod
-    def to_jpegs(cls, data: bytes, dpi: int = DEFAULT_DPI) -> list[bytes]:
-        """Return one JPEG per page of the PDF, in order, rendered at `dpi`."""
+    def _to_jpegs(cls, data: bytes, dpi: int) -> list[bytes]:
         if not cls.MIN_DPI <= dpi <= cls.MAX_DPI:
             raise ToolError(f"DPI must be between {cls.MIN_DPI} and {cls.MAX_DPI}.")
         document = cls._open_pdf(data)
@@ -75,19 +101,12 @@ class PDF:
             document.close()
 
     @classmethod
-    def page_count(cls, data: bytes) -> int:
-        """The number of pages `to_jpegs` would return, without rendering; refuses the same PDFs."""
+    def _page_count(cls, data: bytes) -> int:
         document = cls._open_pdf(data)
         try:
             return len(document)
         finally:
             document.close()
-
-    @staticmethod
-    def jpeg_names(stem: str, count: int) -> list[str]:
-        """File names for `count` pages: `<stem>-1.jpg`, …, zero-padded so they sort in page order."""
-        digits = len(str(count))
-        return [f"{stem}-{number:0{digits}d}.jpg" for number in range(1, count + 1)]
 
     @classmethod
     def _open_pdf(cls, data: bytes) -> pdfium.PdfDocument:

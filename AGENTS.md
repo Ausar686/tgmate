@@ -107,6 +107,10 @@ narration, or dated TODOs. Match the comment density of neighboring code.
   untrusted deserialization (enforced by `.semgrep.yml`).
 - Every uploaded file and URL is untrusted: check size and type before
   processing, and bound the work (timeouts, page/pixel/duration limits).
+- Tools that parse untrusted files in-process (PDFium, Pillow, …) run each
+  operation in a sandboxed worker process
+  ([tools/sandbox.py](src/tgmate/tools/sandbox.py)); a new such tool
+  registers its operations in [tools/worker.py](src/tgmate/tools/worker.py).
 - External binaries (e.g. converters, downloaders) run with an argument list,
   a timeout and a per-job temporary directory that is always cleaned up; user
   input never becomes an option (pass `--` before positional paths/URLs).

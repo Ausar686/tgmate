@@ -6,8 +6,20 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from tgmate.config import Settings
 from tgmate.storage import db
+from tgmate.tools import sandbox, worker
 
 OWNER = 1
+
+
+@pytest.fixture(autouse=True)
+def in_process_sandbox(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Run sandboxed tool operations through the worker's request handling, but in the test's own process.
+
+    Starting a process per conversion would slow the suite and hide the operations from coverage; the process itself
+    is tested in `tests/tools/test_sandbox.py`, marked `real_sandbox`.
+    """
+    if request.node.get_closest_marker("real_sandbox") is None:
+        monkeypatch.setattr(sandbox, "_execute", worker.handle)
 
 
 @pytest.fixture

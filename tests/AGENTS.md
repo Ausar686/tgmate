@@ -17,6 +17,12 @@
   `engine`/`session`/`settings` fixtures in `conftest.py` give each test a
   fresh, migrated SQLite database.
 
+- Sandboxed tool operations run in the test's own process by default (the
+  autouse `in_process_sandbox` fixture swaps `sandbox._execute` for
+  `worker.handle`), which keeps the suite fast and the operations visible to
+  coverage. Tests of the worker process itself are marked `real_sandbox`
+  ([tools/test_sandbox.py](tools/test_sandbox.py)).
+
 ## Writing tests
 - Add or update a test for every behavior change.
 - Assert the stated behavior, not merely that code runs; avoid weak

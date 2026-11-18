@@ -10,6 +10,30 @@ them and present the result.
 - Any other exception is a bug or an environment problem, not the user's
   fault.
 
+## Sandbox ([sandbox.py](sandbox.py), [worker.py](worker.py))
+Operations that parse untrusted files run in a separate worker process
+(`python -I -m tgmate.tools.worker`), so a crash, hang or memory blow-up in
+native code fails one conversion instead of the caller. The tool's public
+method calls `sandbox.run(operation, inputs, options, outputs)`; the worker
+looks the operation up in `worker.OPERATIONS` and runs the tool's in-process
+implementation (the `_`-prefixed method).
+- **Process:** an empty environment (no token or settings), `-I` (no
+  `PYTHON*` variables, user site-packages or current directory on the import
+  path) and its own process group, killed with everything it started once
+  the operation ends or fails.
+- **Limits:** `sandbox.TIMEOUT_SECONDS` of wall-clock time; in the worker,
+  `worker.MEMORY_LIMIT_BYTES` of address space (Linux only: macOS refuses
+  it), CPU time a little over the timeout, no file writes and few open files.
+  At most `sandbox.MAX_OUTPUT_BYTES` of results are read back.
+- **Protocol:** inputs and results are length-prefixed blobs over the pipes,
+  with the operation and its options as a JSON header; nothing is pickled.
+  Library output on stdout is moved to stderr, so it can't corrupt results.
+- **Errors:** the worker's `ToolError` is re-raised in the caller with the
+  same message, and running out of memory becomes one too. A timeout or
+  oversized result is a `ToolError` saying so. Anything else (a crash, a bug,
+  malformed output) is logged with the end of the worker's stderr and
+  reported as "The conversion failed unexpectedly."
+
 ## QR code ([qr.py](qr.py))
 `QRCode.from_url(url, fmt=PNG, scale=10) -> bytes` returns the image.
 - **Address:** surrounding whitespace is stripped and `https://` is added
@@ -26,7 +50,8 @@ them and present the result.
 
 ## PDF ([pdf.py](pdf.py))
 PDFium (via pypdfium2) builds and renders PDFs; Pillow reads images. Both
-work on bytes in memory, so nothing touches the disk.
+work on bytes in memory, so nothing touches the disk. Every public method
+runs in the [sandbox](#sandbox).
 
 `PDF.from_images(images, page_size=A4) -> bytes`: one page per image, in
 order.

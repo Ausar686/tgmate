@@ -46,6 +46,7 @@ default-groups = ["dev"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+markers = ["real_sandbox: start real worker processes instead of running sandboxed operations in-process"]
 
 [tool.ruff]
 line-length = 120
