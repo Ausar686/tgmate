@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
-FROM python:3.14.9-slim-trixie AS builder
+FROM python:3.15.2-slim-trixie AS builder
 COPY --from=uv /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -17,7 +17,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-editable
 
-FROM python:3.14.9-slim-trixie
+FROM python:3.15.2-slim-trixie
 # Debian (not Alpine) so later tools can install LibreOffice and ffmpeg from its packages. Apply security fixes
 # newer than the base tag, and drop the base image's pip: the app runs from its own venv, so pip is only unused
 # attack surface.
