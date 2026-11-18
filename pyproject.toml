@@ -1,0 +1,65 @@
+[project]
+name = "tgmate"
+version = "0.1.0"
+description = "Everyday tools with CLI & Telegram integration"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[build-system]
+requires = ["uv_build==0.13.9"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+wheel-exclude = ["**/*.md"]
+
+[dependency-groups]
+dev = [
+    "bandit==1.9.4",
+    "coverage==7.17.3",
+    "pre-commit==4.7.0",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.5.0",
+    "ruff==0.17.5",
+    "semgrep==1.186.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 120
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "UP", "B", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tgmate"]
+
+[tool.coverage.run]
+branch = true
+source = ["tgmate"]
+omit = ["*/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+# Added to coverage's defaults (which already cover `# pragma: no cover`).
+exclude_also = [
+    "raise NotImplementedError",
+    "if __name__ == [\"']__main__[\"']:",
+    "if t.TYPE_CHECKING:",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
