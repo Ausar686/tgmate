@@ -11,6 +11,12 @@
 - Run: `coverage run -m pytest` (with coverage) or `pytest -q` (fast). Subset:
   `pytest tests/test_smoke.py -q`.
 
+- Bot tests feed updates through the real dispatcher
+  (`dispatcher.feed_update`) with a fake Bot API (`telegram/fake_api.py`)
+  that records every call; build updates with `telegram/updates.py`. The
+  `engine`/`session`/`settings` fixtures in `conftest.py` give each test a
+  fresh, migrated SQLite database.
+
 ## Writing tests
 - Add or update a test for every behavior change.
 - Assert the stated behavior, not merely that code runs; avoid weak

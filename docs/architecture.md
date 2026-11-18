@@ -10,7 +10,7 @@ bot, with the same behavior in both.
 ## Tools
 | Tool | What it does | Status |
 | --- | --- | --- |
-| QR code | Web address → PNG or SVG QR code | Available ([tools](../src/tgmate/tools/README.md)) |
+| QR code | Web address → PNG or SVG QR code | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | Images → PDF | One or more images → one PDF | Planned |
 | PDF → JPG | One JPG per page | Planned |
 | DOC(X) → PDF | Office document → PDF | Planned |
@@ -25,9 +25,19 @@ bot, with the same behavior in both.
   message is shown to the user as is.
 - **CLI:** Typer, one subcommand per tool (`tgmate <tool>`). Command list:
   [cli](../src/tgmate/cli/README.md).
-- **Telegram access:** allowlist only, approved by the owner, like memedexer.
+- **Telegram access:** private chats only; the bot leaves any group or
+  channel it's added to. Users need the owner's approval (`OWNER_USER_ID`),
+  requested by DM the first time they write, like memedexer's chat approval.
   Because only approved users can use it, the risks of the YouTube tools
-  (terms of service, blocked server IPs) are accepted.
+  (terms of service, blocked server IPs) are accepted. Details:
+  [telegram](../src/tgmate/telegram/README.md).
+- **Telegram interaction:** the user sends something (a link, a file), the bot
+  replies with buttons for the tools that fit it, and the result replies to
+  the user's message. Commands (`/qr <link>`) are a shortcut. QR codes are
+  sent as photos.
+- **Storage:** SQLite via SQLAlchemy async, migrated with Alembic at startup,
+  like memedexer; it holds only users and their access status
+  ([storage](../src/tgmate/storage/README.md)).
 - **Telegram file limits:** the bot starts on Telegram's hosted Bot API
   (receives up to 20 MB, sends up to 50 MB) and refuses larger files with a
   clear message. The YouTube PR moves it to a self-hosted Bot API server
