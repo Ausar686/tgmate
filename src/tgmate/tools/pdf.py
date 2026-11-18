@@ -68,6 +68,24 @@ class PDF:
         """Return one JPEG per page of the PDF, in order, rendered at `dpi`."""
         if not cls.MIN_DPI <= dpi <= cls.MAX_DPI:
             raise ToolError(f"DPI must be between {cls.MIN_DPI} and {cls.MAX_DPI}.")
+        document = cls._open_pdf(data)
+        try:
+            return [cls._render_page(document[index], dpi) for index in range(len(document))]
+        finally:
+            document.close()
+
+    @classmethod
+    def page_count(cls, data: bytes) -> int:
+        """The number of pages `to_jpegs` would return, without rendering; refuses the same PDFs."""
+        document = cls._open_pdf(data)
+        try:
+            return len(document)
+        finally:
+            document.close()
+
+    @classmethod
+    def _open_pdf(cls, data: bytes) -> pdfium.PdfDocument:
+        """The loaded PDF, after checking it isn't encrypted or too long; refuses anything else with `ToolError`."""
         try:
             # PDFium also refuses a PDF without pages, so every document that loads has some.
             document = pdfium.PdfDocument(data)
@@ -75,12 +93,11 @@ class PDF:
             if getattr(exc, "err_code", None) == pdfium_raw.FPDF_ERR_PASSWORD:
                 raise ToolError("The PDF is password-protected; remove the password first.") from exc
             raise ToolError("This isn't a PDF I can read.") from exc
-        try:
-            if len(document) > cls.MAX_PAGES:
-                raise ToolError(f"The PDF has {len(document)} pages; the limit is {cls.MAX_PAGES}.")
-            return [cls._render_page(document[index], dpi) for index in range(len(document))]
-        finally:
+        if len(document) > cls.MAX_PAGES:
+            pages = len(document)
             document.close()
+            raise ToolError(f"The PDF has {pages} pages; the limit is {cls.MAX_PAGES}.")
+        return document
 
     @classmethod
     def _add_image_page(cls, document: pdfium.PdfDocument, data: bytes, number: int, page_size: PageSize) -> None:
@@ -110,9 +127,13 @@ class PDF:
     @classmethod
     def _open_image(cls, data: bytes, number: int) -> Image.Image:
         """The decoded image, after checking its format and size; refuses anything else with `ToolError`."""
+        limit = f"the limit is {cls.MAX_IMAGE_PIXELS // 1_000_000} megapixels"
         try:
             image = Image.open(io.BytesIO(data))
-        except (UnidentifiedImageError, Image.DecompressionBombError) as exc:
+        except Image.DecompressionBombError as exc:
+            # Pillow's own, higher limit, hit before ours can look at the size.
+            raise ToolError(f"Image {number} is too large; {limit}.") from exc
+        except UnidentifiedImageError as exc:
             raise ToolError(f"File {number} isn't an image I can read.") from exc
         if image.format not in cls.IMAGE_FORMATS:
             image.close()
@@ -120,10 +141,7 @@ class PDF:
             raise ToolError(f"File {number} is a {image.format} image; supported formats: {supported}.")
         if image.width * image.height > cls.MAX_IMAGE_PIXELS:
             image.close()
-            raise ToolError(
-                f"Image {number} is too large ({image.width}×{image.height} pixels); "
-                f"the limit is {cls.MAX_IMAGE_PIXELS // 1_000_000} megapixels."
-            )
+            raise ToolError(f"Image {number} is too large ({image.width}×{image.height} pixels); {limit}.")
         try:
             image.load()
         except OSError as exc:

@@ -6,7 +6,7 @@ from typer.testing import CliRunner
 from tests.images import make_image, pdf_pages
 from tests.terminal import plain
 from tgmate.cli.app import app
-from tgmate.tools.pdf import PAPER_SIZES, PageSize
+from tgmate.tools.pdf import PAPER_SIZES, PDF, PageSize
 
 runner = CliRunner()
 
@@ -81,9 +81,16 @@ def test_pdf_to_jpg_pads_page_numbers_to_sort_in_order(tmp_path: pathlib.Path) -
     assert result.stdout.splitlines()[-1] == "doc-10.jpg"
 
 
-def test_pdf_to_jpg_writes_nothing_if_any_page_file_exists(tmp_path: pathlib.Path) -> None:
+def test_pdf_to_jpg_writes_nothing_and_renders_nothing_if_any_page_file_exists(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     runner.invoke(app, ["images-to-pdf", "a.jpg", "b.png", "-o", "doc.pdf"])
     (tmp_path / "doc-2.jpg").write_bytes(b"keep")
+
+    def no_rendering(*args: object) -> None:
+        raise AssertionError("rendered before checking the outputs")
+
+    monkeypatch.setattr(PDF, "to_jpegs", no_rendering)
 
     result = runner.invoke(app, ["pdf-to-jpg", "doc.pdf"])
 

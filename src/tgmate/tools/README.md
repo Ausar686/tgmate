@@ -52,3 +52,6 @@ order.
   records the resolution it was rendered at, so it prints at the page's size.
 - Refused: more than `MAX_PAGES` pages, password-protected PDFs, and anything
   PDFium can't open (which includes PDFs without pages).
+
+`PDF.page_count(pdf) -> int`: how many images `to_jpegs` would return, without
+rendering, and refusing the same PDFs; lets a caller check its outputs first.

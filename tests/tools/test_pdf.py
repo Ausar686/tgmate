@@ -244,3 +244,34 @@ def test_an_enormous_page_still_records_a_valid_resolution(monkeypatch: pytest.M
     [page] = PDF.to_jpegs(PDF.from_images([make_image(size=(30, 60))]), dpi=150)
 
     assert Image.open(io.BytesIO(page)).info["dpi"] == pytest.approx((1, 1))
+
+
+def test_image_beyond_pillows_own_limit_is_reported_as_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pillow refuses images over twice its limit while opening them, before our size check runs.
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+
+    with pytest.raises(ToolError, match=r"^Image 1 is too large; the limit is 50 megapixels\.$"):
+        PDF.from_images([make_image(size=(40, 20))])
+
+
+def test_page_count_matches_the_pages_rendered() -> None:
+    pdf = PDF.from_images([make_image()] * 3)
+
+    assert PDF.page_count(pdf) == len(PDF.to_jpegs(pdf, dpi=36)) == 3
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [(ENCRYPTED, "password-protected"), (b"just text", "isn't a PDF I can read")],
+)
+def test_page_count_refuses_what_rendering_refuses(data: bytes, message: str) -> None:
+    with pytest.raises(ToolError, match=message):
+        PDF.page_count(data)
+
+
+def test_page_count_refuses_too_many_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    pdf = PDF.from_images([make_image()] * 3)
+    monkeypatch.setattr(PDF, "MAX_PAGES", 2)
+
+    with pytest.raises(ToolError, match="3 pages; the limit is 2"):
+        PDF.page_count(pdf)
