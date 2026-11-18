@@ -58,7 +58,8 @@ A photo or album with a link in its caption gets both kinds of buttons.
   anything but images is refused: other files go one at a time.
 - **Sizes:** files over `DOWNLOAD_LIMIT` (20 MB, the hosted Bot API's limit)
   are refused before any button is offered, and again when one is pressed.
-  Results over `UPLOAD_LIMIT` (50 MB) are refused instead of sent.
+  Results with a file over `UPLOAD_LIMIT` (50 MB, per file) are refused
+  instead of sent.
 - **Results** reply to the user's message, with Telegram showing "sending a
   file…" meanwhile:
   - QR codes as photos captioned with the encoded address (cut to Telegram's
@@ -66,7 +67,8 @@ A photo or album with a link in its caption gets both kinds of buttons.
   - images → one PDF on A4 pages, named after the first image's file (photos
     have none: `images.pdf`);
   - PDF → its pages as JPEG files at the tool's default resolution, named
-    like the CLI's (`report-1.jpg`, …): one file, an album of up to
+    like the CLI's (`report-1.jpg`, …, zero-padded from 10 pages:
+    `report-01.jpg`): one file, an album of up to
     `ALBUM_LIMIT` (10), or a ZIP (`report.zip`) for more. Names keep only the
     sent file's base name, so a crafted name can't put folders into the ZIP.
   - A tool's refusal (`ToolError`) is sent as the reply instead.

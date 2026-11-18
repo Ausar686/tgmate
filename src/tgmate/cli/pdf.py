@@ -41,7 +41,7 @@ def pdf_to_jpg(
     dpi: t.Annotated[int, typer.Option(min=PDF.MIN_DPI, max=PDF.MAX_DPI, help="Resolution.")] = PDF.DEFAULT_DPI,
     force: Force = False,
 ) -> None:
-    """Save each page of a PDF as a JPEG: <name>-1.jpg, <name>-2.jpg, …"""
+    """Save each page of a PDF as a JPEG: <name>-1.jpg, <name>-2.jpg, … (zero-padded to sort in order)."""
     data = pdf.read_bytes()
     targets = [output_dir / name for name in PDF.jpeg_names(pdf.stem, PDF.page_count(data))]
     # Before rendering, which can take a while for a long PDF at a high DPI.

@@ -58,7 +58,7 @@ def update(text: str | None = None, *, update_id: int = 1, **kwargs: t.Any) -> U
 
 
 def photo(file_id: str, size: int, width: int = 40, height: int = 20) -> list[dict[str, t.Any]]:
-    """A photo's sizes as Telegram sends them, smallest first; only the largest has `file_id`."""
+    """A photo's sizes as Telegram sends them, smallest first; the largest has `file_id`, the thumbnail its own."""
     thumbnail = {"file_id": f"{file_id}-thumb", "file_unique_id": "t", "width": 4, "height": 2, "file_size": 100}
     largest = {"file_id": file_id, "file_unique_id": "p", "width": width, "height": height, "file_size": size}
     return [thumbnail, largest]

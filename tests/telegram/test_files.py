@@ -252,6 +252,21 @@ async def test_file_grown_past_the_limit_is_refused_when_pressed(
     assert telegram.calls(SendDocument) == []
 
 
+@pytest.mark.parametrize(("headroom", "sent"), [(0, True), (-1, False)])
+async def test_upload_limit_applies_to_each_page_not_the_album(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, monkeypatch: pytest.MonkeyPatch, headroom: int, sent: bool
+) -> None:
+    pdf = a_pdf(3)
+    largest = max(map(len, PDF.to_jpegs(pdf)))
+    # Below the three pages' total either way.
+    monkeypatch.setattr(files, "UPLOAD_LIMIT", largest + headroom)
+
+    await press(dispatcher, bot, "jpg", document_message(telegram, pdf, PDF_TYPE, "report.pdf"))
+
+    assert len(telegram.calls(SendMediaGroup)) == int(sent)
+    assert [text.startswith("The result is") for text in telegram.sent_texts(USER)] == ([] if sent else [True])
+
+
 # --- buttons whose file is gone or doesn't fit ---
 
 

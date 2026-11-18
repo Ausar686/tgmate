@@ -116,16 +116,16 @@ class Albums:
         del self._arriving[key]
         return sorted(arriving, key=lambda album_message: album_message.message_id)
 
-    def keep(self, user_id: int, files: list[Attachment]) -> str:
+    def keep(self, chat_id: int, files: list[Attachment]) -> str:
         """Store the album's files and return the token its buttons carry."""
         now = time.monotonic()
         self._kept = {key: kept for key, kept in self._kept.items() if kept[0] > now}
         token = secrets.token_urlsafe(9)
-        self._kept[(user_id, token)] = (now + self.ttl, files)
+        self._kept[(chat_id, token)] = (now + self.ttl, files)
         return token
 
-    def get(self, user_id: int, token: str) -> list[Attachment] | None:
-        expires, files = self._kept.get((user_id, token), (0.0, None))
+    def get(self, chat_id: int, token: str) -> list[Attachment] | None:
+        expires, files = self._kept.get((chat_id, token), (0.0, None))
         return files if expires > time.monotonic() else None
 
 
@@ -156,7 +156,8 @@ async def send_jpegs(bot: Bot, source: Message, pdf: Attachment) -> None:
             name = stem(pdf.name, "document")
             files = dict(zip(PDF.jpeg_names(name, len(pages)), pages, strict=True))
             archive = await asyncio.to_thread(zip_files, files) if len(files) > ALBUM_LIMIT else None
-            check_sendable(len(archive) if archive is not None else sum(map(len, pages)))
+            # Telegram's limit is per file: the ZIP, or each page sent on its own or in an album.
+            check_sendable(len(archive) if archive is not None else max(map(len, pages)))
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
