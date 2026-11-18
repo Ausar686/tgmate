@@ -52,6 +52,13 @@ OPERATIONS: dict[str, Operation] = {
         Limits(file_bytes=sandbox.MAX_OUTPUT_BYTES, open_files=1024),
     ),
 }
+# In force from the start, before the request says which operation's (tighter or equal) limits apply.
+LOOSEST_LIMITS = Limits(
+    **{
+        field.name: max(getattr(operation.limits, field.name) for operation in OPERATIONS.values())
+        for field in dataclasses.fields(Limits)
+    }
+)
 
 
 def handle(request: bytes) -> sandbox.Result:
@@ -74,6 +81,8 @@ def main() -> None:  # pragma: no cover
     # Keep stdout for the results alone: anything a library prints goes to stderr instead.
     results = os.fdopen(os.dup(sys.stdout.fileno()), "wb")
     os.dup2(sys.stderr.fileno(), sys.stdout.fileno())
+    # Limited before reading the request, then tightened to the operation's limits: lowering a limit is always allowed.
+    _limit_resources(LOOSEST_LIMITS)
     request = sys.stdin.buffer.read()
     operation, _, _ = sandbox.decode_request(request)
     _limit_resources(OPERATIONS[operation].limits)

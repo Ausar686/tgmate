@@ -217,3 +217,11 @@ def test_running_out_of_memory_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> 
     result = worker.handle(sandbox.encode_request("test", {}, []))
 
     assert result == (sandbox.TOOL_ERROR_STATUS, b"", worker.OUT_OF_MEMORY.encode())
+
+
+def test_the_limits_before_the_request_allow_every_operations_limits() -> None:
+    for operation in worker.OPERATIONS.values():
+        assert operation.limits.memory_bytes <= worker.LOOSEST_LIMITS.memory_bytes
+        assert operation.limits.file_bytes <= worker.LOOSEST_LIMITS.file_bytes
+        assert operation.limits.open_files <= worker.LOOSEST_LIMITS.open_files
+    assert worker.LOOSEST_LIMITS.open_files == 1024
