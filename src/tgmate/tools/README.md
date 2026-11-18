@@ -78,8 +78,9 @@ app), which runs inside the [sandbox](#sandbox) worker.
   per module (SVG units for SVG), from 1 to `QRCode.MAX_SCALE`.
 
 ## PDF ([pdf.py](pdf.py))
-PDFium (via pypdfium2) builds and renders PDFs; Pillow reads images. Both
-work on bytes in memory, so nothing touches the disk. Every public method
+PDFium (via pypdfium2) builds and renders PDFs; Pillow reads images;
+pdf2docx rebuilds PDFs as Word documents. All work on bytes in memory, so
+nothing touches the disk. Every public method
 runs in the [sandbox](#sandbox).
 
 `PDF.from_images(images, page_size=A4) -> bytes`: one page per image, in
@@ -109,6 +110,12 @@ order.
 
 `PDF.page_count(pdf) -> int`: how many images `to_jpegs` would return, without
 rendering, and refusing the same PDFs; lets a caller check its outputs first.
+
+`PDF.to_docx(pdf) -> bytes`: the PDF as an editable Word document, rebuilt
+by pdf2docx (on PyMuPDF): text with its fonts and paragraphs, tables, and
+images, including scanned pages as pictures (there's no OCR). It refuses the
+same PDFs as `to_jpegs`, checked with PDFium first. pdf2docx is imported only
+inside the worker: it configures logging on import and loads OpenCV.
 
 `PDF.jpeg_names(stem, count) -> list[str]`: the file names front ends give
 the pages, `<stem>-1.jpg` onwards, zero-padded to sort in page order.

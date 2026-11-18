@@ -10,6 +10,7 @@ from aiogram.types import Chat, InaccessibleMessage, InlineKeyboardMarkup
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from tests.documents import docx_paragraphs, text_pdf
 from tests.images import close_to, make_image, pdf_page_image, pdf_pages
 from tests.telegram.conftest import seed_user
 from tests.telegram.fake_api import FakeTelegram
@@ -77,7 +78,7 @@ def sent_document(telegram: FakeTelegram) -> tuple[str, bytes]:
     [
         ("photo", [("PDF", "file:pdf:")]),
         ("image", [("PDF", "file:pdf:")]),
-        ("pdf", [("JPG images", "file:jpg:")]),
+        ("pdf", [("JPG images", "file:jpg:"), ("DOCX", "file:docx:")]),
         ("docx", [("PDF", "file:doc-pdf:")]),
         ("rtf", [("PDF", "file:doc-pdf:")]),
     ],
@@ -276,6 +277,30 @@ async def test_upload_limit_applies_to_each_page_not_the_album(
 
     assert len(telegram.calls(SendMediaGroup)) == int(sent)
     assert [text.startswith("The result is") for text in telegram.sent_texts(USER)] == ([] if sent else [True])
+
+
+# --- PDF → DOCX ---
+
+
+async def test_docx_button_replies_with_an_editable_word_document(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
+) -> None:
+    pdf = text_pdf(["Quarterly report", "Second page"])
+
+    await press(dispatcher, bot, "docx", document_message(telegram, pdf, PDF_TYPE, "report.pdf"))
+
+    filename, document = sent_document(telegram)
+    assert filename == "report.docx"
+    assert docx_paragraphs(document) == ["Quarterly report", "Second page"]
+
+
+async def test_pdf_the_docx_tool_refuses_gets_its_reason(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
+) -> None:
+    await press(dispatcher, bot, "docx", document_message(telegram, b"just text", PDF_TYPE, "fake.pdf"))
+
+    assert telegram.sent_texts(USER) == ["This isn&#x27;t a PDF I can read."]
+    assert telegram.calls(SendDocument) == []
 
 
 # --- office documents → PDF ---

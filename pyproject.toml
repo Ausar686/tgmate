@@ -3,15 +3,17 @@ name = "tgmate"
 version = "0.1.0"
 description = "Everyday tools with CLI & Telegram integration"
 readme = "README.md"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 license-files = ["LICENSE"]
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "aiogram==3.32.0",
     "aiosqlite==0.22.1",
     "alembic==1.20.1",
+    "pdf2docx==0.5.13",
     "pillow==13.0.0",
     "pydantic-settings==2.16.3",
+    "pymupdf==1.27.2.3",
     "pypdfium2==5.15.2",
     "segno==1.6.6",
     "sqlalchemy[asyncio]==2.1.9",
@@ -47,6 +49,10 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = ["real_sandbox: start real worker processes instead of running sandboxed operations in-process"]
+filterwarnings = [
+    # PyMuPDF's SWIG bindings, on import; nothing to fix on our side.
+    "ignore:builtin type Swig:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

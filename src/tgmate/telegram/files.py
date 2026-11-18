@@ -1,6 +1,7 @@
 """Files users send: which tools fit them, collecting albums, and replying with the converted files."""
 
 import asyncio
+import collections.abc as cabc
 import dataclasses
 import enum
 import html
@@ -65,7 +66,7 @@ class FileAction(CallbackData, prefix="file"):
 # (button text, tool) for every action that takes a file of that kind; a new file tool adds its row here.
 FILE_ACTIONS = {
     Kind.IMAGE: [("PDF", "pdf")],
-    Kind.PDF: [("JPG images", "jpg")],
+    Kind.PDF: [("JPG images", "jpg"), ("DOCX", "docx")],
     Kind.DOCUMENT: [("PDF", "doc-pdf")],
 }
 TOOL_KINDS = {tool: kind for kind, actions in FILE_ACTIONS.items() for _, tool in actions}
@@ -167,15 +168,27 @@ async def send_pdf(bot: Bot, source: Message, images: list[Attachment]) -> None:
 
 async def send_document_pdf(bot: Bot, source: Message, document: Attachment) -> None:
     """Reply to `source` with the office document as a PDF, or with why it can't be converted."""
+    await _send_converted(bot, source, document, Office.to_pdf, "pdf")
+
+
+async def send_docx(bot: Bot, source: Message, pdf: Attachment) -> None:
+    """Reply to `source` with the PDF as an editable Word document, or with why it can't be converted."""
+    await _send_converted(bot, source, pdf, PDF.to_docx, "docx")
+
+
+async def _send_converted(
+    bot: Bot, source: Message, file: Attachment, convert: cabc.Callable[[bytes], bytes], extension: str
+) -> None:
+    """Reply with `convert` of the file, named after it with `extension`, or with the tool's refusal."""
     async with ChatActionSender.upload_document(source.chat.id, bot):
         try:
-            check_downloadable([document])
-            pdf = await asyncio.to_thread(Office.to_pdf, await download(bot, document))
-            check_sendable(len(pdf))
+            check_downloadable([file])
+            result = await asyncio.to_thread(convert, await download(bot, file))
+            check_sendable(len(result))
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
-        await source.reply_document(BufferedInputFile(pdf, f"{stem(document.name, 'document')}.pdf"))
+        await source.reply_document(BufferedInputFile(result, f"{stem(file.name, 'document')}.{extension}"))
 
 
 async def send_jpegs(bot: Bot, source: Message, pdf: Attachment) -> None:

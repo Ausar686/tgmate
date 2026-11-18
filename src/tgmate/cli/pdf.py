@@ -1,4 +1,4 @@
-"""`tgmate images-to-pdf` and `tgmate pdf-to-jpg`."""
+"""`tgmate images-to-pdf`, `tgmate pdf-to-jpg` and `tgmate pdf-to-docx`."""
 
 import pathlib
 import typing as t
@@ -50,3 +50,18 @@ def pdf_to_jpg(
     output_dir.mkdir(parents=True, exist_ok=True)
     for target, page in zip(targets, pages, strict=True):
         write_output(target, page, force=force, param_hint="--output-dir")
+
+
+def pdf_to_docx(
+    pdf: t.Annotated[pathlib.Path, typer.Argument(exists=True, dir_okay=False, help="PDF to convert.")],
+    output: t.Annotated[
+        pathlib.Path | None,
+        typer.Option("--output", "-o", dir_okay=False, help="Document to write [default: the PDF's name, .docx]."),
+    ] = None,
+    force: Force = False,
+) -> None:
+    """Convert a PDF to an editable Word document (DOCX)."""
+    target = output or pathlib.Path(pdf.stem + ".docx")
+    # Before converting, which can take a while for a long PDF.
+    refuse_existing([target], force=force)
+    write_output(target, PDF.to_docx(pdf.read_bytes()), force=force)

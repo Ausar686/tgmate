@@ -31,6 +31,12 @@ DENIED = "This bot is private."
 WRITE_TO_ASK = "Send me a message to ask the bot owner for access."
 APPROVED = "✅ The bot owner approved your access. Send /help to see what I can do."
 
+
+def source_notice(source_url: str) -> str:
+    """The AGPL's offer of the source code to everyone who uses the bot over the network."""
+    url = html.escape(source_url, quote=True)
+    return f'tgmate is free software under the AGPL-3.0-or-later: <a href="{url}">source code</a>.'
+
 # Revoked users aren't listed: they ask again by writing to the bot.
 _LISTED = {UserStatus.PENDING: "⏳", UserStatus.APPROVED: "✅", UserStatus.REJECTED: "🚫"}
 _OUTCOME = {UserStatus.APPROVED: "approved", UserStatus.REJECTED: "rejected", UserStatus.REVOKED: "revoked"}
@@ -75,7 +81,7 @@ async def require_access(handler: Handler, event: TelegramObject, data: dict[str
         return await handler(event, data)
     if user.status is UserStatus.PENDING and data["approval_requests"].ready(user.id):
         await notify_owner(data["bot"], settings, f"{describe_user(user)} asks to use the bot.", _keyboard(user))
-        await event.answer(REQUESTED)
+        await event.answer(f"{REQUESTED}\n\n{source_notice(settings.source_url)}")
         return None
     notices: Cooldown = data["access_notices"]
     if notices.ready(user.id):

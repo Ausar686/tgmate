@@ -14,7 +14,7 @@ bot, with the same behavior in both.
 | Images → PDF | One or more images → one PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | DOC(X) → PDF | Word, ODT or RTF document → PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| PDF → DOCX | PDF → editable Word document | Planned |
+| PDF → DOCX | PDF → editable Word document | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | YouTube → MP3 / MP4 | Download audio or video | Planned |
 
 ## Decisions
@@ -61,10 +61,17 @@ bot, with the same behavior in both.
   packages) converts DOCX, DOC, ODT and RTF; it's the only free converter
   with good Word fidelity. It runs inside the sandbox worker with a fresh
   profile per job that blocks linked web and local content, and it roughly
-  doubles the Docker image (about 920 MB). Outside Docker it must be
+  more than doubles the Docker image (387 → about 920 MB). Outside Docker it must be
   installed separately; the tool says so when it's missing.
 - **yt-dlp:** pinned and frozen; updated to the latest release only on
   request, after a breakage, and checked against the failing link.
-- **License:** MIT for now. The PR that adds PDF → DOCX moves the project to
-  AGPL-3.0-or-later (its library, PyMuPDF, is AGPL); the bot will then link
-  to its source code, as the AGPL requires for network use.
+- **License:** AGPL-3.0-or-later, since PDF → DOCX uses PyMuPDF (AGPL).
+  As the AGPL requires for network use, the bot offers its source code
+  (`SOURCE_URL`, this repository by default) in `/help` and in its first reply
+  to anyone who asks for access.
+- **PDF → DOCX:** pdf2docx on PyMuPDF 1.27, pinned below 2.x: PyMuPDF 2
+  depends on onnxruntime and AI layout packages, which the project doesn't
+  want without a need, while 1.27 has no dependencies. pdf2docx brings
+  OpenCV (classic image processing, not AI) and numpy, about 240 MB in all
+  (the Docker image grows to about 1.3 GB).
+  It parses untrusted PDFs in Python, so it runs in the sandbox worker.

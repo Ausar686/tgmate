@@ -22,7 +22,9 @@ cp .env.example .env
 Fill in `TELEGRAM_BOT_TOKEN` and `OWNER_USER_ID`. Every other variable falls
 back to its default when left empty; the defaults and meanings live in
 [config.py](../src/tgmate/config.py). Compose pins `DATABASE_URL` to the
-volume, so the value in `.env` is ignored there.
+volume, so the value in `.env` is ignored there. If you deploy a modified
+version, set `SOURCE_URL` to where its source is published: the AGPL requires
+offering it to the bot's users, and the bot links to it.
 
 ## 3. Run
 ```bash

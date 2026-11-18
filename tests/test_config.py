@@ -8,7 +8,7 @@ REQUIRED = {"TELEGRAM_BOT_TOKEN": "123:abc", "OWNER_USER_ID": "42"}
 
 @pytest.fixture
 def env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
-    for key in ("DATABASE_URL", "LOG_LEVEL"):
+    for key in ("DATABASE_URL", "LOG_LEVEL", "SOURCE_URL"):
         monkeypatch.delenv(key, raising=False)
     for key, value in REQUIRED.items():
         monkeypatch.setenv(key, value)
@@ -22,6 +22,13 @@ def test_reads_required_values_and_defaults(env: pytest.MonkeyPatch) -> None:
     assert settings.owner_user_id == 42
     assert settings.database_url.get_secret_value() == DEFAULT_DATABASE_URL
     assert settings.log_level == "INFO"
+    assert settings.source_url == "https://github.com/Ausar686/tgmate"
+
+
+def test_a_modified_deployment_sets_its_source(env: pytest.MonkeyPatch) -> None:
+    env.setenv("SOURCE_URL", "https://example.com/fork")
+
+    assert Settings(_env_file=None).source_url == "https://example.com/fork"
 
 
 def test_empty_values_fall_back_to_defaults(env: pytest.MonkeyPatch) -> None:

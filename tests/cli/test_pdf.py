@@ -3,6 +3,7 @@ import pathlib
 import pytest
 from typer.testing import CliRunner
 
+from tests.documents import docx_paragraphs, text_pdf
 from tests.images import make_image, pdf_pages
 from tests.terminal import plain
 from tgmate.cli.app import app
@@ -135,3 +136,45 @@ def test_a_page_file_appearing_after_the_check_names_the_output_dir(
     assert result.exit_code == 2
     assert "--output-dir" in plain(result.stderr)
     assert (tmp_path / "doc-1.jpg").read_bytes() == b"raced"
+
+
+def test_pdf_to_docx_writes_the_document_named_after_the_pdf(tmp_path: pathlib.Path) -> None:
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "report.pdf").write_bytes(text_pdf(["Hello from the CLI"]))
+
+    result = runner.invoke(app, ["pdf-to-docx", "docs/report.pdf"])
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "report.docx"
+    assert docx_paragraphs((tmp_path / "report.docx").read_bytes()) == ["Hello from the CLI"]
+
+
+def test_pdf_to_docx_keeps_an_existing_document_without_force(tmp_path: pathlib.Path) -> None:
+    (tmp_path / "report.pdf").write_bytes(b"not even read")
+    (tmp_path / "out.docx").write_bytes(b"keep")
+
+    result = runner.invoke(app, ["pdf-to-docx", "report.pdf", "-o", "out.docx"])
+
+    assert result.exit_code == 2
+    assert "--force" in plain(result.stderr)
+    assert (tmp_path / "out.docx").read_bytes() == b"keep"
+
+
+def test_pdf_to_docx_overwrites_with_force(tmp_path: pathlib.Path) -> None:
+    (tmp_path / "report.pdf").write_bytes(text_pdf(["New"]))
+    (tmp_path / "report.docx").write_bytes(b"old")
+
+    result = runner.invoke(app, ["pdf-to-docx", "report.pdf", "-f"])
+
+    assert result.exit_code == 0
+    assert docx_paragraphs((tmp_path / "report.docx").read_bytes()) == ["New"]
+
+
+def test_pdf_to_docx_reports_a_refusal(tmp_path: pathlib.Path) -> None:
+    (tmp_path / "report.pdf").write_bytes(b"just text")
+
+    result = runner.invoke(app, ["pdf-to-docx", "report.pdf"])
+
+    assert result.exit_code == 1
+    assert result.stderr.strip() == "Error: This isn't a PDF I can read."
+    assert not (tmp_path / "report.docx").exists()

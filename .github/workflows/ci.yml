@@ -79,13 +79,14 @@ jobs:
           docker run --rm tgmate:ci python -c
           "import asyncio; from tgmate.storage import db;
           asyncio.run(db.upgrade(db.create_engine('sqlite+aiosqlite:////data/tgmate.db')))"
-      - name: Convert images to a PDF and back in sandboxed workers inside the image
+      - name: Convert images to a PDF, and it to JPEGs and a DOCX, in sandboxed workers inside the image
         run: >-
           docker run --rm tgmate:ci python -c
           "import io; from PIL import Image; from tgmate.tools.pdf import PDF;
           out = io.BytesIO(); Image.new('RGB', (60, 90), 'red').save(out, 'PNG');
           pdf = PDF.from_images([out.getvalue()] * 2);
-          assert PDF.page_count(pdf) == 2 and len(PDF.to_jpegs(pdf)) == 2"
+          assert PDF.page_count(pdf) == 2 and len(PDF.to_jpegs(pdf)) == 2;
+          assert PDF.to_docx(pdf).startswith(b'PK')"
       - name: Convert a document to PDF with LibreOffice inside the image
         run: >-
           docker run --rm tgmate:ci python -c
