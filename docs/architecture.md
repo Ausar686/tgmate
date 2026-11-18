@@ -52,7 +52,9 @@ bot, with the same behavior in both.
   process (PDFium and Pillow for the PDF tools) run in a separate worker
   process with a timeout, resource limits and no environment, so a crash,
   hang or decompression bomb fails one conversion instead of the bot, and a
-  compromised parser can't read the bot's token or write files. Tools keep
+  compromised parser can't read the bot's token or make any file grow (it
+  runs as the bot's user, so it could still truncate or delete the bot's
+  files; see the tools README for what isn't covered). Tools keep
   their synchronous API, so the CLI and the bot get the same protection
   ([tools](../src/tgmate/tools/README.md#sandbox)).
 - **yt-dlp:** pinned and frozen; updated to the latest release only on

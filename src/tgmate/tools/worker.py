@@ -62,7 +62,8 @@ def main() -> None:  # pragma: no cover
 
 def _limit_resources() -> None:  # pragma: no cover
     resource.setrlimit(resource.RLIMIT_CPU, (CPU_LIMIT_SECONDS, CPU_LIMIT_SECONDS + 1))
-    # No file writes at all (pipes are unaffected), so a compromised worker can't tamper with the database.
+    # No file can grow (pipes are unaffected), so a compromised worker can't add to the database or plant files. It runs
+    # as the caller's user, though, so it could still truncate or delete files that user owns.
     resource.setrlimit(resource.RLIMIT_FSIZE, (0, 0))
     resource.setrlimit(resource.RLIMIT_NOFILE, (OPEN_FILES_LIMIT, OPEN_FILES_LIMIT))
     try:

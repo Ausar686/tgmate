@@ -132,7 +132,7 @@ def test_the_worker_gets_no_secrets(stand_in, monkeypatch: pytest.MonkeyPatch) -
     assert b"TELEGRAM_BOT_TOKEN" not in environment
 
 
-def test_the_worker_cannot_write_files(stand_in, tmp_path: pathlib.Path) -> None:
+def test_the_worker_cannot_make_files_grow(stand_in, tmp_path: pathlib.Path) -> None:
     target = tmp_path / "tampered"
     target.write_bytes(b"")
     write = f"os.write(os.open({str(target)!r}, os.O_WRONLY | os.O_APPEND), b'x')"

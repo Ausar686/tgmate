@@ -23,8 +23,13 @@ implementation (the `_`-prefixed method).
   the operation ends or fails.
 - **Limits:** `sandbox.TIMEOUT_SECONDS` of wall-clock time; in the worker,
   `worker.MEMORY_LIMIT_BYTES` of address space (Linux only: macOS refuses
-  it), CPU time a little over the timeout, no file writes and few open files.
-  At most `sandbox.MAX_OUTPUT_BYTES` of results are read back.
+  it), CPU time a little over the timeout, a file size limit of 0 (no write
+  can make a file grow) and few open files. At most `sandbox.MAX_OUTPUT_BYTES`
+  of results are read back.
+- **Not covered:** the worker runs as the caller's user, so code that
+  exploits a parser could still truncate or delete that user's files (the
+  bot's database, in the Docker image) and open network connections. Closing
+  that needs OS-level confinement (a separate user, seccomp or Landlock).
 - **Protocol:** inputs and results are length-prefixed blobs over the pipes,
   with the operation and its options as a JSON header; nothing is pickled.
   Library output on stdout is moved to stderr, so it can't corrupt results.
