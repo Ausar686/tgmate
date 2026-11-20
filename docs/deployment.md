@@ -24,7 +24,9 @@ back to its default when left empty; the defaults and meanings live in
 [config.py](../src/tgmate/config.py). Compose pins `DATABASE_URL` to the
 volume, so the value in `.env` is ignored there. If you deploy a modified
 version, set `SOURCE_URL` to where its source is published: the AGPL requires
-offering it to the bot's users, and the bot links to it.
+offering it to the bot's users, and the bot links to it. `BOT_MEMORY_LIMIT`
+(default `2g`) caps the container's memory, which bounds conversions and
+downloads together; raise it if several large jobs run at once.
 
 ## 3. Run
 ```bash
@@ -66,6 +68,10 @@ link and pick a tool, or use a command; see
   it, and fails on fixable high or critical vulnerabilities (Trivy).
 
 ## Troubleshooting
+- **YouTube downloads fail with "Sign in to confirm you're not a bot"** or
+  similar: YouTube blocks some server IP ranges. The bot can't work around
+  that; try another network or ask for a yt-dlp update (it's frozen, see
+  [architecture](architecture.md)).
 - **Telegram calls fail with `Request timeout error`** while `curl` on the
   host reaches `api.telegram.org`: the host's VPN or firewall doesn't pass
   bridged container traffic. The service uses Docker's default bridge

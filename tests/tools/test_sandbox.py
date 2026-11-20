@@ -36,8 +36,8 @@ def wrapped_worker(operation: str) -> str:
     return f"from tgmate.tools import worker\n{operation}\n{register}\nworker.main()"
 
 
-def run_test_operation() -> list[bytes]:
-    return sandbox.run("test", [b"input"], {}, outputs=range(0, 10))
+def run_test_operation(timeout: float = sandbox.TIMEOUT_SECONDS) -> list[bytes]:
+    return sandbox.run("test", [b"input"], {}, outputs=range(0, 10), timeout=timeout)
 
 
 # --- the real worker ---
@@ -65,21 +65,17 @@ def test_a_refusal_in_the_worker_is_the_callers_tool_error() -> None:
 # --- containment, with stand-in workers ---
 
 
-def test_a_hanging_worker_is_killed(stand_in, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(sandbox, "TIMEOUT_SECONDS", 0.5)
+def test_a_hanging_worker_is_killed(stand_in) -> None:
     stand_in("import time; time.sleep(60)")
 
     started = time.monotonic()
-    with pytest.raises(ToolError, match=r"^The conversion took longer than 0\.5 seconds; try a smaller file\.$"):
-        run_test_operation()
+    with pytest.raises(ToolError, match=r"^This took longer than 0\.5 seconds, so I stopped; try something smaller\.$"):
+        run_test_operation(timeout=0.5)
 
     assert time.monotonic() - started < 5
 
 
-def test_processes_the_worker_starts_are_killed_with_it(
-    stand_in, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    monkeypatch.setattr(sandbox, "TIMEOUT_SECONDS", 1)
+def test_processes_the_worker_starts_are_killed_with_it(stand_in, tmp_path: pathlib.Path) -> None:
     pid_file = tmp_path / "pid"
     stand_in(
         "import pathlib, subprocess, sys, time\n"
@@ -89,7 +85,7 @@ def test_processes_the_worker_starts_are_killed_with_it(
     )
 
     with pytest.raises(ToolError, match="took longer than"):
-        run_test_operation()
+        run_test_operation(timeout=1)
 
     pid = int(pid_file.read_text())
     assert eventually_gone(pid), f"process {pid}, started by the worker, is still running"
@@ -166,12 +162,11 @@ def test_the_worker_reads_its_input_and_options(stand_in) -> None:
 @pytest.mark.parametrize("script", ["import sys; sys.stdout.buffer.write(b'x' * 1000)", "import time; time.sleep(60)"])
 def test_a_flooding_worker_is_stopped(stand_in, monkeypatch: pytest.MonkeyPatch, script: str) -> None:
     monkeypatch.setattr(sandbox, "MAX_OUTPUT_BYTES", 100)
-    monkeypatch.setattr(sandbox, "TIMEOUT_SECONDS", 5)
     stand_in(f"import sys; sys.stdout.buffer.write(b'x' * 1000); sys.stdout.flush(); {script}")
 
     started = time.monotonic()
     with pytest.raises(ToolError, match=r"^The result would be over 0 MB\.$"):
-        run_test_operation()
+        run_test_operation(timeout=5)
 
     assert time.monotonic() - started < 4
 
@@ -220,7 +215,7 @@ def test_running_out_of_memory_is_a_refusal(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setitem(worker.OPERATIONS, "test", worker.Operation(exhausting))
 
-    result = worker.handle(sandbox.encode_request("test", {}, []))
+    result = worker.handle(sandbox.encode_request(sandbox.Request("test", {}, [], sandbox.TIMEOUT_SECONDS)))
 
     assert result == (sandbox.TOOL_ERROR_STATUS, b"", worker.OUT_OF_MEMORY.encode())
 

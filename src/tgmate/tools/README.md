@@ -21,14 +21,18 @@ implementation (the `_`-prefixed method).
   `PYTHON*` variables, user site-packages or current directory on the import
   path) and its own process group, killed with everything it started once
   the operation ends or fails.
-- **Limits:** `sandbox.TIMEOUT_SECONDS` of wall-clock time; in the worker,
-  CPU time a little over the timeout and the operation's `worker.Limits`:
-  address space (Linux only: macOS refuses it), file size and open files. By
-  default the file size limit is 0 (no write can make a file grow); an
-  operation that runs a program needing files (LibreOffice) raises it and
-  asks `sandbox.run(..., workdir=True)` for an empty directory, which the
-  caller creates and removes even when the worker is killed. At most
-  `sandbox.MAX_OUTPUT_BYTES` of results are read back.
+- **Limits:** wall-clock time (`sandbox.TIMEOUT_SECONDS` unless the call
+  passes `timeout=`, as downloads do); in the worker, CPU time a little over
+  that timeout and the operation's `worker.Limits`: address space (Linux
+  only: macOS refuses it), file size and open files. By default the file
+  size limit is 0 (no write can make a file grow); an operation that writes
+  files (LibreOffice, yt-dlp) raises it and works in the caller's
+  `sandbox.run(..., workdir=…)` directory, which the caller creates and
+  removes, so it's cleaned up even when the worker is killed and the caller
+  can keep what's left there. The YouTube operation's address-space limit is
+  nominal (64 GB): Deno's V8 crashes below that, so in Docker the container's
+  memory limit bounds it. At most `sandbox.MAX_OUTPUT_BYTES` of results are
+  read back.
 - **Not covered:** the worker runs as the caller's user, so code that
   exploits a parser could still truncate or delete that user's files (the
   bot's database, in the Docker image) and open network connections. Closing
@@ -62,6 +66,40 @@ app), which runs inside the [sandbox](#sandbox) worker.
 - **Not covered:** fonts a document uses but the system lacks are replaced
   (the Docker image has Word's metric-compatible fonts and DejaVu, not CJK
   fonts), so layouts can differ from Word's.
+
+## YouTube ([youtube.py](youtube.py))
+`YouTube.download(url, MediaFormat.MP3 | MP4, directory, *, max_height=720,
+max_bytes=2000 MB) -> Media`: one video, downloaded by yt-dlp into the
+caller's `directory` (as `<video id>.mp3` or `.mp4`) inside the
+[sandbox](#sandbox), with a 30-minute timeout. `Media` has the file's path,
+the video's title, uploader and duration, and `file_name`: the title made
+safe as a file name, which front ends save or send the file under.
+- **Links:** only youtube.com (`www`, `m`, `music`) and youtu.be links to a
+  single video (`watch?v=`, `shorts/`, `live/`, `embed/`), checked by host and
+  an 11-character ID; the download uses the canonical `watch?v=<id>` address,
+  so playlist and timestamp parameters are dropped. yt-dlp may use only its
+  YouTube extractor (never the generic one, which fetches whatever a page
+  points at), loads no plugins, keeps no cache, and names files after the ID,
+  so nothing from the page reaches a path.
+- **MP3:** the best audio, converted by ffmpeg at 192 kbps, with title and
+  artist tags. **MP4:** the best video up to `max_height` on its shorter side
+  (so vertical videos aren't penalised; the smallest above it when nothing is
+  that small), preferring H.264 and AAC, which every player handles, merged
+  with the best audio.
+- **Refused** with `ToolError`, before downloading where possible: anything
+  but a single video, live streams and premieres, videos over
+  `MAX_DURATION_SECONDS` (3 hours) or of unknown length, estimated or actual
+  sizes over `max_bytes`, a height outside 144–2160, what YouTube refuses
+  (its message, without yt-dlp's prefixes), and ffmpeg not being installed.
+  A 403 from YouTube's stream servers, which happens now and then, gets one
+  more attempt from scratch.
+- **Dependencies:** yt-dlp is frozen at its pinned release, with its
+  `default` extra (the `yt-dlp-ejs` challenge solver and friends) and its
+  `deno` extra (Deno from PyPI, which runs YouTube's challenge JavaScript
+  without file, network or environment permissions). ffmpeg and ffprobe come
+  from the system (`PATH`); Docker installs Debian's.
+- **Live check:** `TGMATE_NETWORK_TESTS=1 pytest tests/tools/test_youtube_live.py`
+  downloads a real video; run it after updating yt-dlp.
 
 ## QR code ([qr.py](qr.py))
 `QRCode.from_url(url, fmt=PNG, scale=10) -> bytes` returns the image.

@@ -15,7 +15,7 @@ def doc_to_pdf(
     ],
     output: t.Annotated[
         pathlib.Path | None,
-        typer.Option("--output", "-o", dir_okay=False, help="PDF to write [default: the document's name, .pdf]."),
+        typer.Option("--output", "-o", dir_okay=False, help="PDF to write (default: the document's name, .pdf)."),
     ] = None,
     force: t.Annotated[bool, typer.Option("--force", "-f", help="Overwrite the output file.")] = False,
 ) -> None:

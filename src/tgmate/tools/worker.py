@@ -15,10 +15,11 @@ from tgmate.tools import sandbox
 from tgmate.tools.errors import ToolError
 from tgmate.tools.office import Office
 from tgmate.tools.pdf import PDF, PageSize
+from tgmate.tools.youtube import YouTube
 
 MB = 1024 * 1024
-# A little over the parent's wall-clock timeout, so a worker the parent lost track of still stops.
-CPU_LIMIT_SECONDS = sandbox.TIMEOUT_SECONDS + 5
+# CPU time beyond the request's wall-clock timeout, so a worker the parent lost track of still stops.
+CPU_LIMIT_MARGIN_SECONDS = 5
 OUT_OF_MEMORY = "The file needs more memory than I allow for one conversion."
 
 
@@ -52,6 +53,13 @@ OPERATIONS: dict[str, Operation] = {
         lambda inputs, soffice, workdir: [Office._to_pdf(inputs[0], soffice, pathlib.Path(workdir))],
         Limits(file_bytes=sandbox.MAX_OUTPUT_BYTES, open_files=1024),
     ),
+    # yt-dlp downloads into the job's directory and runs ffmpeg and Deno. Deno's V8 reserves tens of gigabytes of
+    # address space up front and crashes below about 64 GB, so this limit is nominal: the container's memory limit
+    # (docker-compose.yaml) bounds real use.
+    "youtube.download": Operation(
+        lambda inputs, workdir, **options: [YouTube._download(workdir=pathlib.Path(workdir), **options)],
+        Limits(memory_bytes=64 * 1024 * MB, file_bytes=4096 * MB, open_files=1024),
+    ),
 }
 # In force from the start, before the request says which operation's (tighter or equal) limits apply.
 LOOSEST_LIMITS = Limits(
@@ -64,7 +72,7 @@ LOOSEST_LIMITS = Limits(
 
 def handle(request: bytes) -> sandbox.Result:
     """Run the request's operation in this process, answering as the worker process would."""
-    operation, options, inputs = sandbox.decode_request(request)
+    operation, options, inputs, _ = sandbox.decode_request(request)
     try:
         outputs = OPERATIONS[operation].run(inputs, **options)
     except ToolError as exc:
@@ -85,8 +93,10 @@ def main() -> None:  # pragma: no cover
     # Limited before reading the request, then tightened to the operation's limits: lowering a limit is always allowed.
     _limit_resources(LOOSEST_LIMITS)
     request = sys.stdin.buffer.read()
-    operation, _, _ = sandbox.decode_request(request)
-    _limit_resources(OPERATIONS[operation].limits)
+    decoded = sandbox.decode_request(request)
+    _limit_resources(OPERATIONS[decoded.operation].limits)
+    cpu_seconds = int(decoded.timeout) + CPU_LIMIT_MARGIN_SECONDS
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
     result = handle(request)
     results.write(result.stdout)
     results.flush()
@@ -96,7 +106,6 @@ def main() -> None:  # pragma: no cover
 
 
 def _limit_resources(limits: Limits) -> None:  # pragma: no cover
-    resource.setrlimit(resource.RLIMIT_CPU, (CPU_LIMIT_SECONDS, CPU_LIMIT_SECONDS + 1))
     resource.setrlimit(resource.RLIMIT_FSIZE, (limits.file_bytes, limits.file_bytes))
     resource.setrlimit(resource.RLIMIT_NOFILE, (limits.open_files, limits.open_files))
     try:
