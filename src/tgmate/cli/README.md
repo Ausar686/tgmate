@@ -11,6 +11,8 @@ arguments, calls the tool and writes the result.
 | `tgmate images-to-pdf IMAGE... [-o NAME.pdf] [--page-size a4\|letter\|image] [-f]` | Combines images into one PDF, one page each; named after the first image by default | [pdf.py](pdf.py) |
 | `tgmate pdf-to-jpg PDF [-o DIR] [--dpi 150] [-f]` | Writes each page as `DIR/<name>-<n>.jpg`, numbers zero-padded to sort in order | [pdf.py](pdf.py) |
 | `tgmate pdf-to-docx PDF [-o NAME.docx] [-f]` | Converts a PDF to an editable Word document; named after the PDF, in the current folder, by default | [pdf.py](pdf.py) |
+| `tgmate youtube-to-mp3 URL [-o NAME.mp3] [-f]` | Downloads a YouTube video's audio as MP3 (needs ffmpeg); named after the video's title by default | [youtube.py](youtube.py) |
+| `tgmate youtube-to-mp4 URL [-o NAME.mp4] [--max-height 720] [-f]` | Downloads a YouTube video as MP4, at most `--max-height` on its shorter side | [youtube.py](youtube.py) |
 | `tgmate doc-to-pdf DOCUMENT [-o NAME.pdf] [-f]` | Converts a DOCX, DOC, ODT or RTF document to PDF with LibreOffice (which must be installed); named after the document, in the current folder, by default | [office.py](office.py) |
 
 `tgmate --help` and `tgmate <command> --help` list every option.

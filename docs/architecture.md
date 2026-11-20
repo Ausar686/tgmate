@@ -15,7 +15,7 @@ bot, with the same behavior in both.
 | PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | DOC(X) → PDF | Word, ODT or RTF document → PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → DOCX | PDF → editable Word document | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| YouTube → MP3 / MP4 | Download audio or video | Planned |
+| YouTube → MP3 / MP4 | Download audio or video | CLI ([tools](../src/tgmate/tools/README.md)); Telegram after the self-hosted Bot API server |
 
 ## Decisions
 - **Tools vs front ends:** each tool is a class in `tgmate.tools` whose
@@ -63,8 +63,16 @@ bot, with the same behavior in both.
   profile per job that blocks linked web and local content, and it roughly
   more than doubles the Docker image (387 → about 920 MB). Outside Docker it must be
   installed separately; the tool says so when it's missing.
-- **yt-dlp:** pinned and frozen; updated to the latest release only on
-  request, after a breakage, and checked against the failing link.
+- **yt-dlp:** pinned and frozen (Dependabot ignores it); updated to the
+  latest release only on request, after a breakage, and checked against the
+  failing link with the live test. Its `deno` extra brings Deno, which
+  YouTube's challenges now need, from PyPI, so it's locked with the rest.
+- **ffmpeg:** Debian's package, which gets security fixes with each image
+  build's upgrade and is visible to Trivy, over a smaller static build; it
+  adds about 540 MB, so the image is about 2 GB.
+- **Memory:** Deno can't run under an address-space limit below about
+  64 GB, so the YouTube worker's is nominal, and docker-compose limits the
+  whole container's memory instead (`BOT_MEMORY_LIMIT`, 2 GB by default).
 - **License:** AGPL-3.0-or-later, since PDF → DOCX uses PyMuPDF (AGPL).
   As the AGPL requires for network use, the bot offers its source code
   (`SOURCE_URL`, this repository by default) in `/help` and in its first reply

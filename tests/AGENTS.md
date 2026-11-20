@@ -23,6 +23,9 @@
   coverage. Tests of the worker process itself are marked `real_sandbox`
   ([tools/test_sandbox.py](tools/test_sandbox.py)).
 
+- Tests that need the network are opt-in: they skip unless
+  `TGMATE_NETWORK_TESTS=1` ([tools/test_youtube_live.py](tools/test_youtube_live.py)).
+
 ## Writing tests
 - Add or update a test for every behavior change.
 - Assert the stated behavior, not merely that code runs; avoid weak

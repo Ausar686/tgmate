@@ -5,6 +5,7 @@ import io
 import pathlib
 import shutil
 import subprocess  # nosec B404
+import tempfile
 import zipfile
 
 from tgmate.tools import sandbox
@@ -75,9 +76,11 @@ class Office:
     @classmethod
     def to_pdf(cls, data: bytes) -> bytes:
         """Return the document (DOCX, DOC, ODT or RTF) as a PDF."""
-        [pdf] = sandbox.run(
-            "office.to_pdf", [data], {"soffice": cls.soffice()}, outputs=range(1, 2), workdir=True
-        )
+        soffice = cls.soffice()
+        with tempfile.TemporaryDirectory(prefix="tgmate-") as workdir:
+            [pdf] = sandbox.run(
+                "office.to_pdf", [data], {"soffice": soffice}, outputs=range(1, 2), workdir=pathlib.Path(workdir)
+            )
         return pdf
 
     @staticmethod
