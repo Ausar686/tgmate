@@ -9,6 +9,7 @@ uv sync
 uv run tgmate qr example.com -o qr.png   # QR code for https://example.com
 uv run tgmate images-to-pdf scan1.jpg scan2.jpg -o scan.pdf
 uv run tgmate pdf-to-jpg scan.pdf -o pages/
+uv run tgmate pdf-to-docx scan.pdf
 uv run tgmate doc-to-pdf report.docx        # needs LibreOffice installed
 uv run tgmate --help                      # all commands
 ```
@@ -108,4 +109,14 @@ See [AGENTS.md](AGENTS.md) for the full conventions.
 
 ## License
 
-[MIT](LICENSE)
+Copyright (C) 2026 Gleb Yushkov
+
+tgmate is free software: you can redistribute it and/or modify it under the
+terms of the [GNU Affero General Public License](LICENSE) as published by the
+Free Software Foundation, either version 3 of the License, or (at your option)
+any later version. It's distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; see the license for details.
+
+The AGPL covers use over a network: if you run a modified version of the bot
+for others, set `SOURCE_URL` to where its source code is published, so the bot
+offers it to its users.

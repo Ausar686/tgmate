@@ -6,6 +6,11 @@ updates:
       interval: weekly
     # Some dependencies (e.g. typer) ship several releases a month, often quick follow-up fixes; waiting a week
     # skips the ones that are superseded right away.
+    ignore:
+      # PyMuPDF 2 depends on onnxruntime and AI layout packages, which this project doesn't want without a need;
+      # 1.27 has no dependencies at all. Moving to 2.x is a deliberate decision, so only 1.x updates are proposed.
+      - dependency-name: pymupdf
+        update-types: ["version-update:semver-major"]
     cooldown:
       default-days: 7
     commit-message:

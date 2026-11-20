@@ -1,4 +1,4 @@
-"""PDF tools: images into one PDF, and PDF pages into JPEG images."""
+"""PDF tools: images into one PDF, and a PDF into JPEG images or an editable Word document."""
 
 import collections.abc as cabc
 import enum
@@ -28,7 +28,7 @@ PAPER_SIZES = {PageSize.A4: (595.28, 841.89), PageSize.LETTER: (612.0, 792.0)}
 
 
 class PDF:
-    """Builds a PDF from images and renders a PDF's pages as JPEG images, each in a sandboxed process."""
+    """Builds a PDF from images, and turns a PDF into JPEG images or a DOCX, each in a sandboxed process."""
 
     MAX_IMAGES = 100
     # Checked before decoding, so a small file that unpacks into a huge image (a decompression bomb) is refused.
@@ -66,6 +66,12 @@ class PDF:
             raise ToolError(sandbox.FAILED)
         return int(count)
 
+    @classmethod
+    def to_docx(cls, data: bytes) -> bytes:
+        """Return the PDF as an editable Word document, rebuilding its text, tables and images."""
+        [docx] = sandbox.run("pdf.to_docx", [data], {}, outputs=range(1, 2))
+        return docx
+
     @staticmethod
     def jpeg_names(stem: str, count: int) -> list[str]:
         """File names for `count` pages: `<stem>-1.jpg`, …, zero-padded so they sort in page order."""
@@ -99,6 +105,22 @@ class PDF:
             return [cls._render_page(document[index], dpi) for index in range(len(document))]
         finally:
             document.close()
+
+    @classmethod
+    def _to_docx(cls, data: bytes) -> bytes:
+        # The same refusals as rendering (unreadable, password-protected, too long), from PDFium, before pdf2docx parses
+        # the file with PyMuPDF.
+        cls._open_pdf(data).close()
+        # Imported here, in the worker only: pdf2docx configures logging on import and loads OpenCV.
+        from pdf2docx import Converter
+
+        converter = Converter(stream=data)
+        try:
+            output = io.BytesIO()
+            converter.convert(output)
+        finally:
+            converter.close()
+        return output.getvalue()
 
     @classmethod
     def _page_count(cls, data: bytes) -> int:

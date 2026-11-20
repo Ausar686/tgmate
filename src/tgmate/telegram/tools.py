@@ -10,7 +10,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from tgmate.config import Settings
-from tgmate.telegram.access import require_access
+from tgmate.telegram.access import require_access, source_notice
 from tgmate.telegram.files import (
     DOWNLOAD_LIMIT,
     FILE_ACTIONS,
@@ -23,6 +23,7 @@ from tgmate.telegram.files import (
     attachment,
     check_downloadable,
     send_document_pdf,
+    send_docx,
     send_jpegs,
     send_pdf,
 )
@@ -38,6 +39,7 @@ HELP = (
     "• a link → <b>QR code</b>: an image that opens the link when scanned\n"
     "• photos or images, one or an album → <b>PDF</b>: one page per image\n"
     "• a PDF → <b>JPG images</b>: one per page, as a ZIP above 10 pages\n"
+    "• a PDF → <b>DOCX</b>: an editable Word document\n"
     "• a Word (DOCX, DOC), ODT or RTF document → <b>PDF</b>\n"
     f"I take files up to {DOWNLOAD_LIMIT // MB} MB.\n\n"
     "Or use a command:\n"
@@ -92,7 +94,7 @@ def first_link(message: Message) -> str | None:
 
 async def show_help(message: Message, settings: Settings) -> None:
     owner = message.from_user is not None and message.from_user.id == settings.owner_user_id
-    await message.answer(HELP + (OWNER_HELP if owner else ""))
+    await message.answer(HELP + (OWNER_HELP if owner else "") + f"\n\n{source_notice(settings.source_url)}")
 
 
 async def not_authorized(message: Message) -> None:
@@ -176,6 +178,8 @@ async def run_file_action(query: CallbackQuery, callback_data: FileAction, album
             await send_jpegs(bot, source, files[0])
         case "doc-pdf":
             await send_document_pdf(bot, source, files[0])
+        case "docx":
+            await send_docx(bot, source, files[0])
 
 
 async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> None:

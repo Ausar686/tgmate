@@ -20,3 +20,6 @@ class Settings(DatabaseSettings):
     # The only user who can approve others; always allowed to use the bot.
     owner_user_id: int
     log_level: str = "INFO"
+    # Where the bot's users can get its source code, as the AGPL requires: a modified deployment points this at its
+    # own published source.
+    source_url: str = "https://github.com/Ausar686/tgmate"

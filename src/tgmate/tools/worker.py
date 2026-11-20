@@ -46,6 +46,7 @@ OPERATIONS: dict[str, Operation] = {
     "pdf.from_images": Operation(lambda inputs, page_size: [PDF._from_images(inputs, PageSize(page_size))]),
     "pdf.to_jpegs": Operation(lambda inputs, dpi: PDF._to_jpegs(inputs[0], dpi)),
     "pdf.page_count": Operation(lambda inputs: [str(PDF._page_count(inputs[0])).encode()]),
+    "pdf.to_docx": Operation(lambda inputs: [PDF._to_docx(inputs[0])]),
     # LibreOffice writes its profile and the PDF into the job's directory, and opens many fonts and libraries.
     "office.to_pdf": Operation(
         lambda inputs, soffice, workdir: [Office._to_pdf(inputs[0], soffice, pathlib.Path(workdir))],

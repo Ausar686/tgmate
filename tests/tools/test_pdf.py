@@ -1,10 +1,12 @@
 import io
 import pathlib
+import zipfile
 
 import pypdfium2 as pdfium
 import pytest
 from PIL import Image
 
+from tests.documents import docx_paragraphs, text_pdf
 from tests.images import (
     close_to,
     make_image,
@@ -176,7 +178,6 @@ def test_pages_render_at_the_requested_dpi(dpi: int, size: tuple[int, int]) -> N
     assert Image.open(io.BytesIO(page)).size == size
 
 
-
 def test_pages_record_their_resolution_so_a_round_trip_keeps_the_page_size() -> None:
     pdf = PDF.from_images([make_image(size=(30, 60))])
 
@@ -185,6 +186,7 @@ def test_pages_record_their_resolution_so_a_round_trip_keeps_the_page_size() -> 
     assert Image.open(io.BytesIO(pages[0])).info["dpi"] == pytest.approx((150, 150))
     # Rounding the rendered size up to whole pixels adds at most one pixel (0.48 pt at 150 dpi).
     assert pdf_pages(PDF.from_images(pages, PageSize.IMAGE)) == [pytest.approx(pdf_pages(pdf)[0], abs=0.5)]
+
 
 def test_huge_page_is_rendered_smaller(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(PDF, "MAX_RENDER_PIXELS", 100_000)
@@ -285,3 +287,40 @@ def test_jpeg_names_are_padded_to_sort_in_page_order(count: int, expected: list[
 
     assert names[: len(expected)] == expected
     assert len(names) == count and names[-1] == f"scan-{count}.jpg"
+
+
+# --- PDF → DOCX ---
+
+
+def test_pdf_becomes_a_word_document_with_its_text_in_order() -> None:
+    # Accented Latin only: the test PDF's built-in Helvetica has no Cyrillic or CJK glyphs.
+    pages = ["First page, with some text", "Second page: ünïcödé, naïve façade"]
+
+    document = PDF.to_docx(text_pdf(pages))
+
+    assert document.startswith(b"PK\x03\x04")
+    assert docx_paragraphs(document) == pages
+
+
+def test_scanned_pages_come_through_as_images() -> None:
+    document = PDF.to_docx(PDF.from_images([make_image(size=(30, 60), color="blue")]))
+
+    with zipfile.ZipFile(io.BytesIO(document)) as archive:
+        media = [name for name in archive.namelist() if name.startswith("word/media/")]
+    assert len(media) == 1
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [(ENCRYPTED, "password-protected"), (b"just text", "isn't a PDF I can read")],
+)
+def test_docx_refuses_what_rendering_refuses(data: bytes, message: str) -> None:
+    with pytest.raises(ToolError, match=message):
+        PDF.to_docx(data)
+
+
+def test_docx_refuses_too_many_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(PDF, "MAX_PAGES", 1)
+
+    with pytest.raises(ToolError, match="2 pages; the limit is 1"):
+        PDF.to_docx(text_pdf(["one", "two"]))

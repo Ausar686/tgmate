@@ -120,7 +120,6 @@ async def test_long_link_caption_is_cut_to_telegram_limit(
     assert caption.endswith("…") and link.startswith(caption[:-1])
 
 
-
 async def test_caption_limit_counts_escaped_characters_once(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:
@@ -136,6 +135,7 @@ async def test_caption_limit_counts_escaped_characters_once(
     shown = html.unescape(caption)
     assert len(shown) == CAPTION_LIMIT
     assert shown.endswith("…") and link.startswith(shown[:-1])
+
 
 async def test_button_for_a_tool_that_no_longer_exists_does_nothing(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram

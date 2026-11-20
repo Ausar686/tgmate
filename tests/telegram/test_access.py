@@ -8,9 +8,14 @@ from tests.conftest import OWNER
 from tests.telegram.conftest import seed_user, user_status
 from tests.telegram.fake_api import FakeTelegram
 from tests.telegram.updates import USER, callback_update, command_update, member_update, update
+from tgmate.config import Settings
 from tgmate.storage.models import User, UserStatus
-from tgmate.telegram.access import APPROVED, DENIED, REQUESTED, WAITING, WRITE_TO_ASK, UserAction
+from tgmate.telegram.access import APPROVED, DENIED, REQUESTED, WAITING, WRITE_TO_ASK, UserAction, source_notice
+from tgmate.telegram.app import build_dispatcher
 from tgmate.telegram.tools import HELP, NOT_AUTHORIZED, OWNER_HELP, LinkAction
+
+# The fixtures' settings keep the default source address.
+SOURCE = "\n\n" + source_notice(Settings.model_fields["source_url"].default)
 
 
 def forbidden(method: type) -> TelegramForbiddenError:
@@ -34,7 +39,7 @@ async def test_unknown_user_is_registered_and_the_owner_is_asked(
     assert "<b>Al &lt;ice&gt; B</b> @al (<code>5</code>)" in request.text
     buttons = [UserAction.unpack(b.callback_data) for b in request.reply_markup.inline_keyboard[0]]
     assert [(b.action, b.user_id) for b in buttons] == [("approve", USER), ("reject", USER)]
-    assert (reply.chat_id, reply.text) == (USER, REQUESTED)
+    assert (reply.chat_id, reply.text) == (USER, REQUESTED + SOURCE)
 
 
 async def test_pending_user_asks_the_owner_once_and_hears_why_once_an_hour(
@@ -44,7 +49,7 @@ async def test_pending_user_asks_the_owner_once_and_hears_why_once_an_hour(
         await dispatcher.feed_update(bot, update("hello?", update_id=update_id))
 
     assert len(telegram.sent_texts(OWNER)) == 1
-    assert telegram.sent_texts(USER) == [REQUESTED, WAITING]
+    assert telegram.sent_texts(USER) == [REQUESTED + SOURCE, WAITING]
 
 
 async def test_request_is_still_acknowledged_when_the_owner_cannot_be_reached(
@@ -54,7 +59,7 @@ async def test_request_is_still_acknowledged_when_the_owner_cannot_be_reached(
 
     await dispatcher.feed_update(bot, update("hi"))
 
-    assert telegram.sent_texts(USER) == [REQUESTED]
+    assert telegram.sent_texts(USER) == [REQUESTED + SOURCE]
     assert "telegram call failed" in caplog.text
 
 
@@ -156,7 +161,7 @@ async def test_revoked_user_who_writes_asks_again(
 
     assert await user_status(sessionmaker, USER) is UserStatus.PENDING
     assert len(telegram.sent_texts(OWNER)) == 1
-    assert telegram.sent_texts(USER) == [REQUESTED]
+    assert telegram.sent_texts(USER) == [REQUESTED + SOURCE]
 
 
 async def test_approved_user_gets_help_and_their_names_are_refreshed(
@@ -166,7 +171,7 @@ async def test_approved_user_gets_help_and_their_names_are_refreshed(
 
     await dispatcher.feed_update(bot, command_update("/start", full_name=("Alicia", None), username=None))
 
-    assert telegram.sent_texts(USER) == [HELP]
+    assert telegram.sent_texts(USER) == [HELP + SOURCE]
     async with sessionmaker() as session:
         user = await session.get(User, USER)
     assert (user.full_name, user.username, user.status) == ("Alicia", None, UserStatus.APPROVED)
@@ -177,8 +182,22 @@ async def test_owner_is_always_allowed_and_never_stored(
 ) -> None:
     await dispatcher.feed_update(bot, command_update("/help", user_id=OWNER))
 
-    assert telegram.sent_texts(OWNER) == [HELP + OWNER_HELP]
+    assert telegram.sent_texts(OWNER) == [HELP + OWNER_HELP + SOURCE]
     assert await user_status(sessionmaker, OWNER) is None
+
+
+async def test_a_modified_deployment_offers_its_own_source(
+    sessionmaker: async_sessionmaker[AsyncSession], bot: Bot, telegram: FakeTelegram, settings: Settings
+) -> None:
+    fork = settings.model_copy(update={"source_url": "https://example.com/fork?a=1&b=2"})
+    dispatcher = build_dispatcher(sessionmaker=sessionmaker, settings=fork)
+
+    await dispatcher.feed_update(bot, update("hello"))
+    await dispatcher.feed_update(bot, command_update("/help", user_id=OWNER))
+
+    link = '<a href="https://example.com/fork?a=1&amp;b=2">source code</a>.'
+    assert telegram.sent_texts(USER)[0].endswith(link)
+    assert telegram.sent_texts(OWNER)[-1].endswith(link)
 
 
 @pytest.mark.parametrize(
@@ -258,7 +277,7 @@ async def test_users_command_from_someone_not_approved_only_requests_access(
 ) -> None:
     await dispatcher.feed_update(bot, command_update("/users"))
 
-    assert telegram.sent_texts(USER) == [REQUESTED]
+    assert telegram.sent_texts(USER) == [REQUESTED + SOURCE]
 
 
 @pytest.mark.parametrize("chat_type", ["group", "supergroup", "channel"])

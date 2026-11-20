@@ -1,9 +1,11 @@
-"""Builders for minimal office documents, and reading text back from PDFs."""
+"""Builders for minimal office documents and text PDFs, and reading text back from PDFs and Word documents."""
 
 import collections.abc as cabc
 import io
 import zipfile
 
+import docx as python_docx
+import pymupdf
 import pypdfium2 as pdfium
 
 W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
@@ -107,3 +109,19 @@ def pdf_text(pdf: bytes) -> str:
         return "\n".join(document[index].get_textpage().get_text_range() for index in range(len(document)))
     finally:
         document.close()
+
+
+def text_pdf(pages: cabc.Sequence[str]) -> bytes:
+    """A PDF with one line of real text (not an image of it) per page."""
+    document = pymupdf.open()
+    try:
+        for text in pages:
+            document.new_page().insert_text((72, 72), text, fontsize=14)
+        return document.tobytes()
+    finally:
+        document.close()
+
+
+def docx_paragraphs(data: bytes) -> list[str]:
+    """The text of a Word document's non-empty paragraphs, in order."""
+    return [paragraph.text for paragraph in python_docx.Document(io.BytesIO(data)).paragraphs if paragraph.text]

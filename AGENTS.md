@@ -115,7 +115,7 @@ narration, or dated TODOs. Match the comment density of neighboring code.
   a timeout and a per-job temporary directory that is always cleaned up; user
   input never becomes an option (pass `--` before positional paths/URLs).
 - Never hardcode, log or commit secrets; load them from the environment.
-- New dependencies must be justified, license-compatible with MIT, pinned with
+- New dependencies must be justified, license-compatible with AGPL-3.0-or-later, pinned with
   `==` and locked in `uv.lock`.
 
 ## Git conventions

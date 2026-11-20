@@ -8,6 +8,7 @@ import time
 import pytest
 from PIL import Image
 
+from tests.documents import docx_paragraphs, text_pdf
 from tests.images import close_to, make_image, pdf_page_image
 from tgmate.tools import sandbox, worker
 from tgmate.tools.errors import ToolError
@@ -49,6 +50,11 @@ def test_operations_round_trip_through_a_worker_process() -> None:
     pages = PDF.to_jpegs(pdf, dpi=72)
     assert [Image.open(io.BytesIO(page)).size for page in pages] == [(596, 842)] * 2
     assert close_to(pdf_page_image(pdf).getpixel((297, 420)), BLUE)
+
+
+def test_pdf_to_docx_runs_within_the_workers_limits() -> None:
+    # pdf2docx loads OpenCV and numpy, which must fit the worker's memory limit and write no files.
+    assert docx_paragraphs(PDF.to_docx(text_pdf(["Hello from a worker"]))) == ["Hello from a worker"]
 
 
 def test_a_refusal_in_the_worker_is_the_callers_tool_error() -> None:
