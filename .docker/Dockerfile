@@ -1,6 +1,6 @@
 FROM ghcr.io/astral-sh/uv:0.13.9 AS uv
 
-FROM python:3.14.9-slim-trixie AS builder
+FROM python:3.14.10-slim-trixie AS builder
 COPY --from=uv /uv /bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -17,7 +17,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-editable
 
-FROM python:3.14.9-slim-trixie
+FROM python:3.14.10-slim-trixie
 # Debian (not Alpine) for LibreOffice and, later, ffmpeg from its packages. Apply security fixes newer than the base
 # tag, and drop the base image's pip: the app runs from its own venv, so pip is only unused attack surface.
 # LibreOffice Writer without its GUI converts documents to PDF. The fonts match the metrics of Word's defaults
