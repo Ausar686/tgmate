@@ -88,12 +88,20 @@ jobs:
           assert PDF.page_count(pdf) == 2 and len(PDF.to_jpegs(pdf)) == 2;
           assert PDF.to_docx(pdf).startswith(b'PK')"
       - name: Run ffmpeg, ffprobe and Deno inside the image, as the YouTube worker does
-        run: >-
-          docker run --rm tgmate:ci python -c
-          "import deno, subprocess; from tgmate.tools.youtube import YouTube;
-          ffmpeg = YouTube.ffmpeg();
-          [subprocess.run([f'{ffmpeg}/{tool}', '-version'], check=True, capture_output=True) for tool in ('ffmpeg', 'ffprobe')];
-          subprocess.run([deno.find_deno_bin(), '--version'], check=True, env={})"
+        run: |
+          docker run --rm -i tgmate:ci python - <<'EOF'
+          import subprocess
+
+          import deno
+
+          from tgmate.tools.youtube import YouTube
+
+          ffmpeg = YouTube.ffmpeg()
+          for tool in ("ffmpeg", "ffprobe"):
+              subprocess.run([f"{ffmpeg}/{tool}", "-version"], check=True, capture_output=True)
+          # The worker's environment is empty.
+          subprocess.run([deno.find_deno_bin(), "--version"], check=True, env={})
+          EOF
       - name: Convert a document to PDF with LibreOffice inside the image
         run: >-
           docker run --rm tgmate:ci python -c
