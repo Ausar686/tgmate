@@ -91,7 +91,10 @@ A photo or album with a link in its caption gets both kinds of buttons.
     a file Telegram won't take gets `SEND_FAILED` (and a log line). The files
     live in a per-job directory under `JOBS_DIR`, removed once sent; the bot
     empties `JOBS_DIR` at startup, since a shutdown can't stop a download's
-    thread and may leave one. Sending gets 30 minutes
+    thread and may leave one, and makes it again if it goes missing. It
+    refuses (at startup, or with `UNAVAILABLE` to a download) a `JOBS_DIR`
+    that isn't a directory only it can use, such as another user's or a
+    symlink in a shared `/tmp`. Sending gets 30 minutes
     (`SEND_TIMEOUT_SECONDS`): a local server answers once Telegram has the
     whole file. `Downloads` allows one download
     per user at a time (another press gets `BUSY`) and `DOWNLOAD_SLOTS` (2)
