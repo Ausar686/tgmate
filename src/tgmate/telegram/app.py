@@ -20,7 +20,7 @@ from tgmate.telegram.cooldown import Cooldown
 from tgmate.telegram.files import Albums, Limits
 from tgmate.telegram.setup import prepare_bot
 from tgmate.telegram.tools import build_tools_router
-from tgmate.telegram.youtube import Downloads
+from tgmate.telegram.youtube import Downloads, clear_jobs
 
 # A local Bot API server sits next to the bot, so a slow request is a large file on its way, not a lost connection.
 LOCAL_REQUEST_TIMEOUT_SECONDS = 10 * 60
@@ -54,6 +54,7 @@ def api_session(settings: Settings) -> AiohttpSession:
 async def run(settings: Settings) -> None:
     engine = db.create_engine(settings.database_url.get_secret_value())
     await db.upgrade(engine)
+    clear_jobs()
     bot = Bot(
         settings.telegram_bot_token.get_secret_value(),
         session=api_session(settings),

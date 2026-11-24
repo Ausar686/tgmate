@@ -16,7 +16,7 @@ from tests.telegram.updates import USER, callback_update, link_update, message_d
 from tgmate.storage.models import UserStatus
 from tgmate.telegram.files import MB, Limits
 from tgmate.telegram.tools import LinkAction
-from tgmate.telegram.youtube import BUSY, SEND_TIMEOUT_SECONDS, WORKING, Downloads
+from tgmate.telegram.youtube import BUSY, SEND_FAILED, SEND_TIMEOUT_SECONDS, WORKING, Downloads, clear_jobs
 from tgmate.tools.errors import ToolError
 from tgmate.tools.youtube import Media, MediaFormat, YouTube
 
@@ -62,14 +62,15 @@ def youtube(monkeypatch: pytest.MonkeyPatch) -> FakeYouTube:
     return fake
 
 
-def youtube_message(message_id: int = 100) -> dict[str, t.Any]:
+def youtube_message(user_id: int = USER) -> dict[str, t.Any]:
     text = f"look {LINK}"
-    return message_data(text, message_id=message_id, entities=[url_entity(text, LINK)])
+    return message_data(text, user_id=user_id, entities=[url_entity(text, LINK)])
 
 
-async def press(dispatcher: Dispatcher, bot: Bot, tool: str, update_id: int = 1) -> None:
+async def press(dispatcher: Dispatcher, bot: Bot, tool: str, update_id: int = 1, user_id: int = USER) -> None:
+    data = LinkAction(tool=tool).pack()
     await dispatcher.feed_update(
-        bot, callback_update(LinkAction(tool=tool).pack(), replying_to=youtube_message(), update_id=update_id)
+        bot, callback_update(data, user_id=user_id, replying_to=youtube_message(user_id), update_id=update_id)
     )
 
 
@@ -191,25 +192,74 @@ async def test_one_download_at_a_time_per_user(
     assert len(telegram.calls(SendAudio)) == 1
 
 
-async def test_downloads_beyond_the_slots_wait_for_one() -> None:
-    downloads = Downloads(slots=1)
-    order: list[str] = []
-    first_in = asyncio.Event()
-    release = asyncio.Event()
+async def test_downloads_beyond_the_slots_wait_for_one(
+    dispatcher: Dispatcher,
+    bot: Bot,
+    telegram: FakeTelegram,
+    youtube: FakeYouTube,
+    sessionmaker: async_sessionmaker[AsyncSession],
+) -> None:
+    other = USER + 1
+    await seed_user(sessionmaker, other, UserStatus.APPROVED)
+    dispatcher["downloads"] = Downloads(slots=1)
+    youtube.release = threading.Event()
+    first = asyncio.create_task(press(dispatcher, bot, "mp4"))
+    await asyncio.to_thread(youtube.started.wait, 5)
 
-    async def download(user_id: int, name: str) -> None:
-        with downloads.for_user(user_id):
-            async with downloads.slots:
-                order.append(f"{name} starts")
-                first_in.set()
-                await release.wait()
-                order.append(f"{name} ends")
+    second = asyncio.create_task(press(dispatcher, bot, "mp3", update_id=2, user_id=other))
+    # The other user's download is accepted (they get the status) but doesn't start while the slot is taken.
+    for _ in range(50):
+        if WORKING in telegram.sent_texts(other):
+            break
+        await asyncio.sleep(0.01)
+    assert telegram.sent_texts(other) == [WORKING]
+    assert len(youtube.calls) == 1
 
-    first = asyncio.create_task(download(1, "first"))
-    await first_in.wait()
-    second = asyncio.create_task(download(2, "second"))
-    await asyncio.sleep(0)
-    release.set()
+    youtube.release.set()
     await asyncio.gather(first, second)
 
-    assert order == ["first starts", "first ends", "second starts", "second ends"]
+    assert [call[1] for call in youtube.calls] == [MediaFormat.MP4, MediaFormat.MP3]
+    assert len(telegram.calls(SendAudio)) == len(telegram.calls(SendVideo)) == 1
+
+
+async def test_a_file_telegram_doesnt_take_gets_a_reply_and_is_removed(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, youtube: FakeYouTube
+) -> None:
+    telegram.errors[SendVideo] = TelegramBadRequest(SendVideo(chat_id=USER, video="x"), "Request Entity Too Large")
+
+    await press(dispatcher, bot, "mp4")
+
+    assert telegram.sent_texts(USER) == [WORKING, html.escape(SEND_FAILED)]
+    [path] = youtube.paths
+    assert not path.parent.exists()
+
+
+async def test_replies_go_out_even_if_the_link_message_is_gone_by_then(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, youtube: FakeYouTube
+) -> None:
+    await press(dispatcher, bot, "mp3")
+    youtube.error = ToolError("YouTube refused: Private video")
+    await press(dispatcher, bot, "mp3", update_id=2)
+
+    replies = [*telegram.calls(SendMessage), *telegram.calls(SendAudio)]
+    assert replies and all(reply.reply_parameters.allow_sending_without_reply for reply in replies)
+
+
+def test_startup_clears_what_interrupted_downloads_left(jobs_dir: pathlib.Path) -> None:
+    (jobs_dir / "tmp1234").mkdir()
+    (jobs_dir / "tmp1234" / "jNQXAC9IVRw.mp4").write_bytes(b"half a video")
+
+    clear_jobs()
+
+    assert list(jobs_dir.iterdir()) == []
+    assert jobs_dir.stat().st_mode & 0o777 == 0o700
+
+
+def test_startup_refuses_a_jobs_directory_it_cant_clear(jobs_dir: pathlib.Path, tmp_path: pathlib.Path) -> None:
+    # Such as a symlink someone else planted where the bot would write.
+    jobs_dir.rmdir()
+    (tmp_path / "elsewhere").mkdir()
+    jobs_dir.symlink_to(tmp_path / "elsewhere")
+
+    with pytest.raises(FileExistsError):
+        clear_jobs()
