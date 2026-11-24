@@ -5,13 +5,15 @@ import collections.abc as cabc
 import contextlib
 import html
 import logging
+import os
 import pathlib
 import shutil
+import stat
 import tempfile
 
 from aiogram import Bot
 from aiogram.enums import ChatAction
-from aiogram.exceptions import TelegramAPIError
+from aiogram.exceptions import AiogramError, TelegramAPIError
 from aiogram.types import FSInputFile, Message, ReplyParameters
 from aiogram.utils.chat_action import ChatActionSender
 
@@ -28,6 +30,7 @@ SEND_TIMEOUT_SECONDS = 30 * 60
 WORKING = "Downloading… long videos can take a few minutes."
 BUSY = "I'm still downloading your previous video; send this one again when it's done."
 SEND_FAILED = "Telegram didn't take the file; try again later."
+UNAVAILABLE = "I can't download anything right now; try again later."
 # Each download's directory goes here, and only the bot uses it, so whatever is here at startup was left by a download
 # that a shutdown interrupted: the sandbox's thread can't be cancelled, and outlives the handler's cleanup.
 JOBS_DIR = pathlib.Path(tempfile.gettempdir()) / "tgmate-youtube"
@@ -36,9 +39,22 @@ JOBS_DIR = pathlib.Path(tempfile.gettempdir()) / "tgmate-youtube"
 def clear_jobs() -> None:
     """Remove what interrupted downloads left; run at startup, before any download."""
     shutil.rmtree(JOBS_DIR, ignore_errors=True)
-    # Fails if anything is still there, such as another user's directory or a symlink: never write into those.
-    JOBS_DIR.mkdir(mode=0o700)
+    jobs_dir()
     return None
+
+
+def jobs_dir() -> pathlib.Path:
+    """`JOBS_DIR`, made again if something removed it (such as a cleaner of old temporary files).
+
+    Refused with `PermissionError` unless it's a directory of the bot's own that only it can use: in a shared temporary
+    directory, another user could have put theirs, or a symlink, there first.
+    """
+    with contextlib.suppress(FileExistsError):
+        JOBS_DIR.mkdir(mode=0o700)
+    info = JOBS_DIR.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
+        raise PermissionError(f"{JOBS_DIR} isn't a directory only the bot can use")
+    return JOBS_DIR
 
 
 def is_youtube_video(link: str) -> bool:
@@ -98,14 +114,20 @@ async def _download_and_send(
 ) -> None:
     action = ChatAction.UPLOAD_VIDEO if media_format is MediaFormat.MP4 else ChatAction.UPLOAD_DOCUMENT
     async with downloads.slots, ChatActionSender(bot=bot, chat_id=source.chat.id, action=action):
-        with tempfile.TemporaryDirectory(dir=JOBS_DIR) as directory:
+        try:
+            jobs = jobs_dir()
+        except OSError as exc:
+            log.error("can't download into %s: %s", JOBS_DIR, exc)
+            raise ToolError(UNAVAILABLE) from exc
+        with tempfile.TemporaryDirectory(dir=jobs) as directory:
             media = await asyncio.to_thread(
                 YouTube.download, link, media_format, pathlib.Path(directory), max_bytes=limits.upload
             )
             try:
                 await _send(bot, source, media, media_format)
-            except TelegramAPIError as exc:
-                # Such as the upload timing out, or the file being over what Telegram takes after all.
+            except AiogramError as exc:
+                # Such as the upload timing out, the file being over what Telegram takes after all, or an answer that
+                # isn't the Bot API's JSON.
                 log.warning("could not send %s to chat %d: %s", media.file_name, source.chat.id, exc)
                 raise ToolError(SEND_FAILED) from exc
     return None

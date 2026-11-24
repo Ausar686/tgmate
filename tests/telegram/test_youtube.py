@@ -16,7 +16,15 @@ from tests.telegram.updates import USER, callback_update, link_update, message_d
 from tgmate.storage.models import UserStatus
 from tgmate.telegram.files import MB, Limits
 from tgmate.telegram.tools import LinkAction
-from tgmate.telegram.youtube import BUSY, SEND_FAILED, SEND_TIMEOUT_SECONDS, WORKING, Downloads, clear_jobs
+from tgmate.telegram.youtube import (
+    BUSY,
+    SEND_FAILED,
+    SEND_TIMEOUT_SECONDS,
+    UNAVAILABLE,
+    WORKING,
+    Downloads,
+    clear_jobs,
+)
 from tgmate.tools.errors import ToolError
 from tgmate.tools.youtube import Media, MediaFormat, YouTube
 
@@ -255,11 +263,41 @@ def test_startup_clears_what_interrupted_downloads_left(jobs_dir: pathlib.Path) 
     assert jobs_dir.stat().st_mode & 0o777 == 0o700
 
 
-def test_startup_refuses_a_jobs_directory_it_cant_clear(jobs_dir: pathlib.Path, tmp_path: pathlib.Path) -> None:
-    # Such as a symlink someone else planted where the bot would write.
+@pytest.mark.parametrize("planted", ["symlink", "open to others"])
+def test_startup_refuses_a_jobs_directory_that_isnt_the_bots_own(
+    jobs_dir: pathlib.Path, tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, planted: str
+) -> None:
     jobs_dir.rmdir()
-    (tmp_path / "elsewhere").mkdir()
-    jobs_dir.symlink_to(tmp_path / "elsewhere")
+    if planted == "symlink":
+        (tmp_path / "elsewhere").mkdir()
+        jobs_dir.symlink_to(tmp_path / "elsewhere")
+    else:
+        # Another user's directory in a shared /tmp, which the bot can't remove.
+        jobs_dir.mkdir()
+        jobs_dir.chmod(0o777)
+        monkeypatch.setattr("shutil.rmtree", lambda path, ignore_errors: None)
 
-    with pytest.raises(FileExistsError):
+    with pytest.raises(PermissionError, match="only the bot can use"):
         clear_jobs()
+
+
+async def test_a_jobs_directory_removed_while_running_is_made_again(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, youtube: FakeYouTube, jobs_dir: pathlib.Path
+) -> None:
+    jobs_dir.rmdir()
+
+    await press(dispatcher, bot, "mp3")
+
+    assert len(telegram.calls(SendAudio)) == 1
+    assert jobs_dir.is_dir() and list(jobs_dir.iterdir()) == []
+
+
+async def test_a_jobs_directory_planted_while_running_is_refused(
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, youtube: FakeYouTube, jobs_dir: pathlib.Path
+) -> None:
+    jobs_dir.chmod(0o777)
+
+    await press(dispatcher, bot, "mp3")
+
+    assert telegram.sent_texts(USER) == [WORKING, html.escape(UNAVAILABLE)]
+    assert youtube.calls == []
