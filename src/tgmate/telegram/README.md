@@ -87,9 +87,13 @@ A photo or album with a link in its caption gets both kinds of buttons.
   - a YouTube link → its MP3 as audio (title, uploader, duration), or its
     MP4 as a streamable video (frame size, duration, the title as caption),
     up to the upload limit. "Downloading…" shows meanwhile and is deleted
-    after; the files live in a per-job temporary directory, removed once
-    sent. Sending gets 30 minutes (`SEND_TIMEOUT_SECONDS`): a local server
-    answers once Telegram has the whole file. `Downloads` allows one download
+    after. Replies go out even if the user deleted their message meanwhile;
+    a file Telegram won't take gets `SEND_FAILED` (and a log line). The files
+    live in a per-job directory under `JOBS_DIR`, removed once sent; the bot
+    empties `JOBS_DIR` at startup, since a shutdown can't stop a download's
+    thread and may leave one. Sending gets 30 minutes
+    (`SEND_TIMEOUT_SECONDS`): a local server answers once Telegram has the
+    whole file. `Downloads` allows one download
     per user at a time (another press gets `BUSY`) and `DOWNLOAD_SLOTS` (2)
     at once in all, since each runs yt-dlp, Deno and ffmpeg; others wait.
   - A tool's refusal (`ToolError`) is sent as the reply instead.
