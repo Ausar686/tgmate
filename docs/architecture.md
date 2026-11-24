@@ -15,7 +15,7 @@ bot, with the same behavior in both.
 | PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | DOC(X) → PDF | Word, ODT or RTF document → PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → DOCX | PDF → editable Word document | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| YouTube → MP3 / MP4 | Download audio or video | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next, on the bot's own Bot API server |
+| YouTube → MP3 / MP4 | Download audio or video | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 
 ## Decisions
 - **Tools vs front ends:** each tool is a class in `tgmate.tools` whose

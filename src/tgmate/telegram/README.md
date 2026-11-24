@@ -1,7 +1,8 @@
 # telegram
 
 The Telegram bot (aiogram 3): who may use it ([access.py](access.py)), what
-it does for them ([tools.py](tools.py), with files in [files.py](files.py)),
+it does for them ([tools.py](tools.py), with files in [files.py](files.py)
+and YouTube in [youtube.py](youtube.py)),
 startup ([setup.py](setup.py)) and wiring ([app.py](app.py)). Run with `python -m tgmate.telegram`; settings
 come from [config.py](../config.py).
 
@@ -38,6 +39,7 @@ Send something, then pick what to do with it:
 | Message | Buttons |
 | --- | --- |
 | Text or a caption with a link | One per link tool (`LINK_ACTIONS`): QR code |
+| …whose link is to a YouTube video | Also MP3 and MP4 (`YOUTUBE_ACTIONS`) |
 | A photo, or a document with an `image/*` type | One per image tool (`FILE_ACTIONS`): PDF |
 | A document with the `application/pdf` type | One per PDF tool: JPG images, DOCX |
 | A Word, ODT or RTF document (`DOCUMENT_TYPES`) | One per document tool: PDF |
@@ -82,6 +84,14 @@ A photo or album with a link in its caption gets both kinds of buttons.
     sent file's base name, so a crafted name can't put folders into the ZIP.
   - PDF → an editable Word document (`report.docx`);
   - a Word, ODT or RTF document → its PDF, named after the document;
+  - a YouTube link → its MP3 as audio (title, uploader, duration), or its
+    MP4 as a streamable video (frame size, duration, the title as caption),
+    up to the upload limit. "Downloading…" shows meanwhile and is deleted
+    after; the files live in a per-job temporary directory, removed once
+    sent. Sending gets 30 minutes (`SEND_TIMEOUT_SECONDS`): a local server
+    answers once Telegram has the whole file. `Downloads` allows one download
+    per user at a time (another press gets `BUSY`) and `DOWNLOAD_SLOTS` (2)
+    at once in all, since each runs yt-dlp, Deno and ffmpeg; others wait.
   - A tool's refusal (`ToolError`) is sent as the reply instead.
 - Tools run in a worker thread so the bot keeps answering meanwhile; the PDF
   tools' work itself happens in a sandboxed process with a timeout

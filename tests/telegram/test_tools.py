@@ -18,7 +18,8 @@ from tests.telegram.updates import (
     url_entity,
 )
 from tgmate.storage.models import UserStatus
-from tgmate.telegram.tools import CAPTION_LIMIT, NOTHING_TO_DO, SOURCE_GONE, LinkAction
+from tgmate.telegram.files import CAPTION_LIMIT
+from tgmate.telegram.tools import NOTHING_TO_DO, SOURCE_GONE, LinkAction
 
 
 @pytest.fixture(autouse=True)

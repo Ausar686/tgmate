@@ -20,6 +20,7 @@ from tgmate.telegram.cooldown import Cooldown
 from tgmate.telegram.files import Albums, Limits
 from tgmate.telegram.setup import prepare_bot
 from tgmate.telegram.tools import build_tools_router
+from tgmate.telegram.youtube import Downloads
 
 # A local Bot API server sits next to the bot, so a slow request is a large file on its way, not a lost connection.
 LOCAL_REQUEST_TIMEOUT_SECONDS = 10 * 60
@@ -32,6 +33,7 @@ def build_dispatcher(settings: Settings, **context: object) -> Dispatcher:
         approval_requests=Cooldown(APPROVAL_REQUEST_INTERVAL_SECONDS),
         access_notices=Cooldown(ACCESS_NOTICE_INTERVAL_SECONDS),
         albums=Albums(),
+        downloads=Downloads(),
     )
     # Access first: the owner's /users and approval buttons must not reach the tools' catch-all handler.
     dispatcher.include_routers(build_access_router(), build_tools_router())

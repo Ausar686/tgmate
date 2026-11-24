@@ -10,13 +10,15 @@ from aiogram.methods import (
     GetChat,
     GetFile,
     GetMe,
+    SendAudio,
     SendDocument,
     SendMediaGroup,
     SendMessage,
     SendPhoto,
+    SendVideo,
     TelegramMethod,
 )
-from aiogram.types import ChatFullInfo, File, Message, User
+from aiogram.types import ChatFullInfo, File, FSInputFile, Message, User
 
 
 class FakeTelegram(BaseSession):
@@ -27,6 +29,10 @@ class FakeTelegram(BaseSession):
         # A local-mode server keeps the files it fetched here and answers GetFile with their path.
         self.local_files = local_files
         self.requests: list[TelegramMethod] = []
+        # Each request's own timeout, if it set one, in the order of `requests`.
+        self.timeouts: list[int | None] = []
+        # Files sent from disk, read when sent: the bot removes them right after.
+        self.uploads: list[tuple[str | None, bytes]] = []
         # A list of errors is consumed one per call, so a call can fail N times and then succeed.
         self.errors: dict[type[TelegramMethod], Exception | list[Exception]] = {}
         # Downloadable files by file id.
@@ -41,6 +47,7 @@ class FakeTelegram(BaseSession):
 
     async def make_request(self, bot: Bot, method: TelegramMethod, timeout: int | None = None) -> t.Any:
         self.requests.append(method)
+        self.timeouts.append(timeout)
         error = self.errors.get(type(method))
         if isinstance(error, list):
             error = error.pop(0) if error else None
@@ -68,6 +75,11 @@ class FakeTelegram(BaseSession):
             )
         if isinstance(method, SendDocument):
             return self._document_message(method.chat_id, method.document.filename)
+        if isinstance(method, SendAudio | SendVideo):
+            media = method.audio if isinstance(method, SendAudio) else method.video
+            assert isinstance(media, FSInputFile)
+            self.uploads.append((media.filename, pathlib.Path(media.path).read_bytes()))
+            return self._document_message(method.chat_id, media.filename)
         if isinstance(method, SendMediaGroup):
             return [self._document_message(method.chat_id, item.media.filename) for item in method.media]
         if isinstance(method, GetFile):

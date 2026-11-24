@@ -45,10 +45,11 @@ class FakeDownloader:
 
     def process_ie_result(self, info: dict, download: bool) -> dict:
         self.downloaded = download
-        extension = "mp3" if self.options.get("postprocessors", [{}])[0].get("key") == "FFmpegExtractAudio" else "mp4"
-        name = self.options["outtmpl"]["default"].replace("%(ext)s", extension)
+        audio = self.options.get("postprocessors", [{}])[0].get("key") == "FFmpegExtractAudio"
+        name = self.options["outtmpl"]["default"].replace("%(ext)s", "mp3" if audio else "mp4")
         (pathlib.Path(self.options["paths"]["home"]) / name).write_bytes(b"\0" * self.size)
-        return info
+        # yt-dlp's result describes the format it chose: here a 480p video with audio, even for MP3.
+        return info | {"width": 854, "height": 480}
 
 
 @pytest.fixture
@@ -131,7 +132,7 @@ def test_mp3_downloads_the_best_audio_and_converts_it(tmp_path: pathlib.Path, do
 def test_mp4_prefers_h264_and_aac_up_to_the_height(tmp_path: pathlib.Path, downloader: type[FakeDownloader]) -> None:
     media = download(tmp_path, MediaFormat.MP4, max_height=480)
 
-    assert media.path == tmp_path / f"{VIDEO}.mp4"
+    assert media == Media(tmp_path / f"{VIDEO}.mp4", "Me at the zoo", "jawed", 19, 854, 480)
     [used] = downloader.created
     assert used.options["format_sort"] == ["res:480", "vcodec:h264", "acodec:aac"]
     assert used.options["merge_output_format"] == "mp4"
@@ -277,7 +278,13 @@ def test_ffmpeg_is_found_with_ffprobe_beside_it(monkeypatch: pytest.MonkeyPatch)
 
 @pytest.mark.parametrize(
     "metadata",
-    [b"not json", b'{"title": 1, "uploader": null, "duration": 19}', b'{"title": "x", "duration": 19}'],
+    [
+        b"not json",
+        b'{"title": 1, "uploader": null, "duration": 19, "width": null, "height": null}',
+        b'{"title": "x", "duration": 19, "width": null, "height": null}',
+        b'{"title": "x", "uploader": null, "duration": 19, "width": "wide", "height": 480}',
+        b'{"title": "x", "uploader": null, "duration": 19}',
+    ],
 )
 def test_a_malformed_report_is_a_failure(tmp_path: pathlib.Path, metadata: bytes) -> None:
     (tmp_path / "x.mp3").write_bytes(b"audio")
@@ -295,8 +302,10 @@ def test_a_report_without_a_proper_file_is_a_failure(tmp_path: pathlib.Path, pro
     elif problem == "too large":
         path.write_bytes(b"\0" * 101)
 
+    metadata = b'{"title": "x", "uploader": null, "duration": 1, "width": null, "height": null}'
+
     with pytest.raises(ToolError, match=f"^{sandbox.FAILED}$"):
-        YouTube._read_metadata(b'{"title": "x", "uploader": null, "duration": 1}', path, 100)
+        YouTube._read_metadata(metadata, path, 100)
 
 
 @pytest.mark.parametrize(

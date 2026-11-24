@@ -25,6 +25,9 @@ from tgmate.tools.pdf import PDF
 MB = 1024 * 1024
 # Telegram's most files in one album; more pages than this are sent as a ZIP.
 ALBUM_LIMIT = 10
+# Telegram's limit for a caption, counted after HTML parsing (`&amp;` is one character), so the plain text is cut
+# before escaping, which also keeps the cut out of escape sequences.
+CAPTION_LIMIT = 1024
 # Telegram delivers an album as one message per file; it's complete once none has arrived for this long.
 ALBUM_WAIT_SECONDS = 1.0
 # How long an album's buttons keep working. Albums are kept in memory, so a restart forgets them too.
@@ -114,6 +117,11 @@ def check_downloadable(files: list[Attachment], limits: Limits) -> None:
 def check_sendable(size: int, limits: Limits) -> None:
     if size > limits.upload:
         raise ToolError(f"The result is {size / MB:.1f} MB; Telegram only lets me send up to {limits.upload // MB} MB.")
+
+
+def caption(text: str) -> str:
+    """`text` cut to Telegram's caption limit and escaped for HTML."""
+    return html.escape(text if len(text) <= CAPTION_LIMIT else text[: CAPTION_LIMIT - 1] + "…")
 
 
 def stem(name: str | None, default: str) -> str:
