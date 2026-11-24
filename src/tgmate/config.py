@@ -43,7 +43,7 @@ class Settings(DatabaseSettings):
     @pydantic.model_validator(mode="after")
     def _check_download_limit(self) -> t.Self:
         if self.telegram_api_url is None and self.download_limit_mb > HOSTED_DOWNLOAD_LIMIT_MB:
-            raise ValueError(f"download_limit_mb can be at most {HOSTED_DOWNLOAD_LIMIT_MB} without TELEGRAM_API_URL")
+            raise ValueError(f"DOWNLOAD_LIMIT_MB can be at most {HOSTED_DOWNLOAD_LIMIT_MB} without TELEGRAM_API_URL")
         if self.download_limit_mb > LOCAL_FILE_LIMIT_MB:
-            raise ValueError(f"download_limit_mb can be at most {LOCAL_FILE_LIMIT_MB}")
+            raise ValueError(f"DOWNLOAD_LIMIT_MB can be at most {LOCAL_FILE_LIMIT_MB}")
         return self

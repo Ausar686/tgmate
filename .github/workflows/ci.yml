@@ -123,6 +123,7 @@ jobs:
       - name: Start the Bot API server as the bot's user and query it
         # Made-up credentials: the server starts and answers, but no bot logs in.
         run: |
+          trap 'docker rm -f bot-api > /dev/null' EXIT
           docker run -d --name bot-api -p 127.0.0.1:8081:8081 \
             -e TELEGRAM_API_ID=1 -e TELEGRAM_API_HASH=0123456789abcdef0123456789abcdef tgmate-bot-api:ci
           test "$(docker exec bot-api id -u)" = 10001

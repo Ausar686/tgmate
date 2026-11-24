@@ -40,8 +40,8 @@ def test_a_local_bot_api_server_takes_larger_files(env: pytest.MonkeyPatch) -> N
 @pytest.mark.parametrize(
     ("api_url", "limit", "error"),
     [
-        ("", "21", "at most 20 without TELEGRAM_API_URL"),
-        ("http://bot-api:8081", "2001", "at most 2000"),
+        ("", "21", "DOWNLOAD_LIMIT_MB can be at most 20 without TELEGRAM_API_URL"),
+        ("http://bot-api:8081", "2001", "DOWNLOAD_LIMIT_MB can be at most 2000"),
         ("", "0", "greater than 0"),
         ("bot-api:8081", "20", "telegram_api_url"),
     ],
