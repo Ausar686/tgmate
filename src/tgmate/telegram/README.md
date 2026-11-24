@@ -57,10 +57,18 @@ A photo or album with a link in its caption gets both kinds of buttons.
   that its buttons carry, for `ALBUM_TTL_SECONDS` and only for that chat.
   After a restart the user is asked to send the album again. An album with
   anything but images is refused: other files go one at a time.
-- **Sizes:** files over `DOWNLOAD_LIMIT` (20 MB, the hosted Bot API's limit)
-  are refused before any button is offered, and again when one is pressed.
-  Results with a file over `UPLOAD_LIMIT` (50 MB, per file) are refused
-  instead of sent.
+- **Sizes** (`Limits`, from the settings): files over `DOWNLOAD_LIMIT_MB`
+  (default 20 MB, the most the hosted Bot API lets bots download) are refused
+  before any button is offered, and again when one is pressed. Results with a
+  file over the upload limit (per file: 50 MB on the hosted Bot API, 2000 MB
+  on the bot's own server) are refused instead of sent.
+- **Bot API server** ([app.py](app.py)): Telegram's hosted one, or the bot's
+  own in local mode when `TELEGRAM_API_URL` is set. In local mode `getFile`
+  returns a path on the server's volume, which the bot reads directly (the
+  same path is mounted into its container), and requests get 10 minutes, for
+  large files on their way. Moving to it starts with
+  `python -m tgmate.telegram.logout` ([logout.py](logout.py)), see
+  [deployment](../../../docs/deployment.md#own-bot-api-server).
 - **Results** reply to the user's message, with Telegram showing "sending a
   file…" meanwhile:
   - QR codes as photos captioned with the encoded address (cut to Telegram's

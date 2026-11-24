@@ -15,7 +15,7 @@ bot, with the same behavior in both.
 | PDF → JPG | One JPG per page | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | DOC(X) → PDF | Word, ODT or RTF document → PDF | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
 | PDF → DOCX | PDF → editable Word document | CLI and Telegram ([tools](../src/tgmate/tools/README.md)) |
-| YouTube → MP3 / MP4 | Download audio or video | CLI ([tools](../src/tgmate/tools/README.md)); Telegram after the self-hosted Bot API server |
+| YouTube → MP3 / MP4 | Download audio or video | CLI ([tools](../src/tgmate/tools/README.md)); Telegram next, on the bot's own Bot API server |
 
 ## Decisions
 - **Tools vs front ends:** each tool is a class in `tgmate.tools` whose
@@ -38,10 +38,18 @@ bot, with the same behavior in both.
 - **Storage:** SQLite via SQLAlchemy async, migrated with Alembic at startup,
   like memedexer; it holds only users and their access status
   ([storage](../src/tgmate/storage/README.md)).
-- **Telegram file limits:** the bot starts on Telegram's hosted Bot API
+- **Telegram file limits:** by default the bot uses Telegram's hosted Bot API
   (receives up to 20 MB, sends up to 50 MB) and refuses larger files with a
-  clear message. The YouTube PR moves it to a self-hosted Bot API server
-  (receives files of any size, sends up to 2 GB).
+  clear message. Optionally it runs its own Bot API server in local mode
+  (receives and sends up to 2000 MB), which YouTube videos need; it's a
+  compose profile, since it needs an API ID and hash from my.telegram.org
+  ([deployment](deployment.md#own-bot-api-server)). Files users send stay
+  capped at `DOWNLOAD_LIMIT_MB` (default 20 MB) either way: they're converted
+  in memory.
+  - **Image:** aiogram's build of Telegram's server (pinned by digest), run
+    as the bot's uid rather than its own: TDLib writes the files it fetches
+    readable by their owner only, and the bot reads them from the shared
+    volume (mounted read-only). TDLib's storage optimizer deletes old ones.
 - **PDF → JPG in Telegram:** up to 10 pages are sent as an album of JPEG
   files (documents, not photos, which Telegram would shrink and recompress);
   more pages are sent as one ZIP.

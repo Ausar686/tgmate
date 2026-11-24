@@ -111,3 +111,34 @@ jobs:
         run: >-
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2
           image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 tgmate:ci
+      - uses: docker/build-push-action@v7
+        with:
+          context: .docker
+          file: .docker/bot-api.Dockerfile
+          pull: true
+          load: true
+          tags: tgmate-bot-api:ci
+          cache-from: type=gha,scope=bot-api
+          cache-to: type=gha,scope=bot-api,mode=max
+      - name: Start the Bot API server as the bot's user and query it
+        # Made-up credentials: the server starts and answers, but no bot logs in.
+        run: |
+          trap 'docker rm -f bot-api > /dev/null' EXIT
+          docker run -d --name bot-api -p 127.0.0.1:8081:8081 \
+            -e TELEGRAM_API_ID=1 -e TELEGRAM_API_HASH=0123456789abcdef0123456789abcdef tgmate-bot-api:ci
+          test "$(docker exec bot-api id -u)" = 10001
+          for attempt in $(seq 30); do
+            curl -s http://127.0.0.1:8081/bot1:fake/getMe | grep -q '"error_code":401' && exit 0
+            sleep 1
+          done
+          docker logs bot-api
+          exit 1
+      - name: Check the compose file with and without the Bot API server
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          docker compose --profile bot-api config -q
+      - name: Scan the Bot API server image for fixable high/critical vulnerabilities
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:0.76.2
+          image --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 tgmate-bot-api:ci

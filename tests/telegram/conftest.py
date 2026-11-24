@@ -28,7 +28,7 @@ def bot(telegram: FakeTelegram) -> Bot:
 
 @pytest.fixture
 def dispatcher(sessionmaker: async_sessionmaker[AsyncSession], settings: Settings) -> Dispatcher:
-    return build_dispatcher(sessionmaker=sessionmaker, settings=settings)
+    return build_dispatcher(settings, sessionmaker=sessionmaker)
 
 
 async def seed_user(

@@ -1,11 +1,15 @@
 import asyncio
 
+import pydantic
 import pytest
 import sqlalchemy as sa
 from aiogram import Dispatcher
+from aiogram.client.session.base import DEFAULT_TIMEOUT
+from aiogram.client.telegram import PRODUCTION
 
 from tgmate.config import Settings
 from tgmate.telegram import app
+from tgmate.telegram.files import MB, Limits
 
 
 async def test_run_migrates_prepares_the_bot_and_polls_for_the_updates_it_handles(
@@ -47,3 +51,27 @@ def test_main_loads_settings_from_the_environment(monkeypatch: pytest.MonkeyPatc
 
     [settings] = ran
     assert settings.owner_user_id == 7
+
+
+def test_without_a_server_of_its_own_the_bot_uses_telegrams(settings: Settings) -> None:
+    session = app.api_session(settings)
+
+    assert session.api is PRODUCTION
+    assert session.timeout == DEFAULT_TIMEOUT
+
+
+def test_a_local_server_is_used_in_local_mode_with_room_for_large_files(settings: Settings) -> None:
+    local = settings.model_copy(update={"telegram_api_url": pydantic.HttpUrl("http://bot-api:8081")})
+
+    session = app.api_session(local)
+
+    assert session.api.is_local
+    assert session.api.api_url("42:T", "getMe") == "http://bot-api:8081/bot42:T/getMe"
+    assert session.timeout == app.LOCAL_REQUEST_TIMEOUT_SECONDS
+
+
+def test_the_dispatcher_gets_the_file_limits_of_the_settings(settings: Settings) -> None:
+    local = settings.model_copy(update={"telegram_api_url": pydantic.HttpUrl("http://bot-api:8081")})
+
+    assert app.build_dispatcher(settings)["limits"] == Limits(20 * MB, 50 * MB)
+    assert app.build_dispatcher(local)["limits"] == Limits(20 * MB, 2000 * MB)

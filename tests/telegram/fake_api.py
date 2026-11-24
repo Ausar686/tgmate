@@ -1,9 +1,11 @@
 import collections.abc as cabc
 import itertools
+import pathlib
 import typing as t
 
 from aiogram import Bot
 from aiogram.client.session.base import BaseSession
+from aiogram.client.telegram import PRODUCTION, TelegramAPIServer
 from aiogram.methods import (
     GetChat,
     GetFile,
@@ -20,8 +22,10 @@ from aiogram.types import ChatFullInfo, File, Message, User
 class FakeTelegram(BaseSession):
     """Bot API stand-in: records every call and answers with realistic objects instead of hitting the network."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, api: TelegramAPIServer = PRODUCTION, local_files: pathlib.Path | None = None) -> None:
+        super().__init__(api=api)
+        # A local-mode server keeps the files it fetched here and answers GetFile with their path.
+        self.local_files = local_files
         self.requests: list[TelegramMethod] = []
         # A list of errors is consumed one per call, so a call can fail N times and then succeed.
         self.errors: dict[type[TelegramMethod], Exception | list[Exception]] = {}
@@ -68,7 +72,12 @@ class FakeTelegram(BaseSession):
             return [self._document_message(method.chat_id, item.media.filename) for item in method.media]
         if isinstance(method, GetFile):
             data = self.files[method.file_id]
-            return File(file_id=method.file_id, file_unique_id="u", file_size=len(data), file_path=method.file_id)
+            file_path = method.file_id
+            if self.local_files is not None:
+                path = self.local_files / method.file_id
+                path.write_bytes(data)
+                file_path = str(path)
+            return File(file_id=method.file_id, file_unique_id="u", file_size=len(data), file_path=file_path)
         if isinstance(method, GetMe):
             return User(id=42, is_bot=True, first_name="tgmate", username="tgmate_bot")
         if isinstance(method, GetChat):
@@ -87,6 +96,8 @@ class FakeTelegram(BaseSession):
         )
 
     async def stream_content(self, url: str, *args: t.Any, **kwargs: t.Any) -> cabc.AsyncGenerator[bytes]:
+        # A local-mode server serves no downloads: the bot must read the file from disk.
+        assert self.local_files is None, url
         # The file path GetFile returned (the file id) ends the download URL.
         yield self.files[url.rsplit("/", 1)[1]]
 

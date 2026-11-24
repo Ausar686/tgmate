@@ -12,7 +12,6 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton
 from tgmate.config import Settings
 from tgmate.telegram.access import require_access, source_notice
 from tgmate.telegram.files import (
-    DOWNLOAD_LIMIT,
     FILE_ACTIONS,
     MB,
     TOOL_KINDS,
@@ -20,6 +19,7 @@ from tgmate.telegram.files import (
     Attachment,
     FileAction,
     Kind,
+    Limits,
     attachment,
     check_downloadable,
     send_document_pdf,
@@ -41,7 +41,7 @@ HELP = (
     "• a PDF → <b>JPG images</b>: one per page, as a ZIP above 10 pages\n"
     "• a PDF → <b>DOCX</b>: an editable Word document\n"
     "• a Word (DOCX, DOC), ODT or RTF document → <b>PDF</b>\n"
-    f"I take files up to {DOWNLOAD_LIMIT // MB} MB.\n\n"
+    "I take files up to {limit} MB.\n\n"
     "Or use a command:\n"
     "/qr &lt;link&gt; — QR code for a link"
 )
@@ -92,9 +92,10 @@ def first_link(message: Message) -> str | None:
     return None
 
 
-async def show_help(message: Message, settings: Settings) -> None:
+async def show_help(message: Message, settings: Settings, limits: Limits) -> None:
     owner = message.from_user is not None and message.from_user.id == settings.owner_user_id
-    await message.answer(HELP + (OWNER_HELP if owner else "") + f"\n\n{source_notice(settings.source_url)}")
+    text = HELP.format(limit=limits.download // MB) + (OWNER_HELP if owner else "")
+    await message.answer(f"{text}\n\n{source_notice(settings.source_url)}")
 
 
 async def not_authorized(message: Message) -> None:
@@ -114,12 +115,12 @@ def _buttons(message: Message, files: list[Attachment], album: str = "") -> list
     return buttons
 
 
-async def offer_actions(message: Message) -> None:
+async def offer_actions(message: Message, limits: Limits) -> None:
     # The prompt replies to the user's message, so the button handlers read the link or file back from it.
     file = attachment(message)
     files = [file] if file is not None else []
     try:
-        check_downloadable(files)
+        check_downloadable(files, limits)
     except ToolError as exc:
         await message.reply(html.escape(str(exc)))
         return
@@ -130,7 +131,7 @@ async def offer_actions(message: Message) -> None:
     await message.reply(PROMPT, reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons]))
 
 
-async def offer_album_actions(message: Message, albums: Albums) -> None:
+async def offer_album_actions(message: Message, albums: Albums, limits: Limits) -> None:
     album = await albums.collect(message)
     if album is None:
         return
@@ -140,7 +141,7 @@ async def offer_album_actions(message: Message, albums: Albums) -> None:
         await first.reply(ALBUM_NOT_IMAGES)
         return
     try:
-        check_downloadable(files)
+        check_downloadable(files, limits)
     except ToolError as exc:
         await first.reply(html.escape(str(exc)))
         return
@@ -150,7 +151,9 @@ async def offer_album_actions(message: Message, albums: Albums) -> None:
     await first.reply(f"What should I do with these {len(files)} images?", reply_markup=keyboard)
 
 
-async def run_file_action(query: CallbackQuery, callback_data: FileAction, albums: Albums, bot: Bot) -> None:
+async def run_file_action(
+    query: CallbackQuery, callback_data: FileAction, albums: Albums, limits: Limits, bot: Bot
+) -> None:
     kind = TOOL_KINDS.get(callback_data.tool)
     if kind is None:
         await query.answer()
@@ -173,13 +176,13 @@ async def run_file_action(query: CallbackQuery, callback_data: FileAction, album
     await query.answer()
     match callback_data.tool:
         case "pdf":
-            await send_pdf(bot, source, files)
+            await send_pdf(bot, source, files, limits)
         case "jpg":
-            await send_jpegs(bot, source, files[0])
+            await send_jpegs(bot, source, files[0], limits)
         case "doc-pdf":
-            await send_document_pdf(bot, source, files[0])
+            await send_document_pdf(bot, source, files[0], limits)
         case "docx":
-            await send_docx(bot, source, files[0])
+            await send_docx(bot, source, files[0], limits)
 
 
 async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> None:

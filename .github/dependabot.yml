@@ -40,7 +40,7 @@ updates:
       hooks:
         patterns: ["*"]
 
-  # Base images in .docker/Dockerfile (python, uv).
+  # Base images in .docker/Dockerfile (python, uv) and .docker/bot-api.Dockerfile (the Bot API server).
   - package-ecosystem: docker
     directory: /.docker
     schedule:

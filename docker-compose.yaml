@@ -10,6 +10,13 @@ services:
       DATABASE_URL: sqlite+aiosqlite:////data/tgmate.db
     volumes:
       - data:/data
+      # The local Bot API server's files, at the paths it reports for them; the bot only reads them.
+      - bot-api:/var/lib/telegram-bot-api:ro
+    depends_on:
+      bot-api:
+        condition: service_started
+        # Only with the bot-api profile; without it the bot uses Telegram's hosted Bot API.
+        required: false
     # Bounds the bot and every worker together: the YouTube worker can't have a per-process memory limit (Deno needs a
     # huge address space), so a runaway job is stopped here, by the kernel, instead of taking the host's memory.
     mem_limit: ${BOT_MEMORY_LIMIT:-2g}
@@ -21,5 +28,29 @@ services:
         max-size: 10m
         max-file: "3"
 
+  # The bot's own Bot API server in local mode (docs/deployment.md), for files up to 2000 MB. Reachable only by the
+  # bot, on the compose network: no ports are published.
+  bot-api:
+    profiles: [bot-api]
+    build:
+      context: .docker
+      dockerfile: bot-api.Dockerfile
+    image: tgmate-bot-api:latest
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+    volumes:
+      - bot-api:/var/lib/telegram-bot-api
+    mem_limit: 1g
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
 volumes:
   data:
+  # The server's session and the files it fetched for the bot; TDLib's storage optimizer removes old files.
+  bot-api:
