@@ -21,18 +21,17 @@ from tgmate.telegram.files import (
     Kind,
     Limits,
     attachment,
+    caption,
     check_downloadable,
     send_document_pdf,
     send_docx,
     send_jpegs,
     send_pdf,
 )
+from tgmate.telegram.youtube import Downloads, is_youtube_video, send_media
 from tgmate.tools.errors import ToolError
 from tgmate.tools.qr import QRCode
-
-# Telegram's limit for a photo caption, counted after HTML parsing (`&amp;` is one character), so the plain text
-# is cut before escaping, which also keeps the cut out of escape sequences.
-CAPTION_LIMIT = 1024
+from tgmate.tools.youtube import MediaFormat, YouTube
 
 HELP = (
     "Send me something and pick what to do with it:\n"
@@ -41,7 +40,9 @@ HELP = (
     "• a PDF → <b>JPG images</b>: one per page, as a ZIP above 10 pages\n"
     "• a PDF → <b>DOCX</b>: an editable Word document\n"
     "• a Word (DOCX, DOC), ODT or RTF document → <b>PDF</b>\n"
-    "I take files up to {limit} MB.\n\n"
+    f"• a YouTube link → <b>MP3</b> or <b>MP4</b>: its audio, or the video up to {YouTube.DEFAULT_MAX_HEIGHT}p, "
+    f"for videos up to {YouTube.MAX_DURATION_SECONDS // 3600} hours\n"
+    "I take files up to {download} MB and send up to {upload} MB.\n\n"
     "Or use a command:\n"
     "/qr &lt;link&gt; — QR code for a link"
 )
@@ -63,6 +64,8 @@ class LinkAction(CallbackData, prefix="link"):
 
 # (button text, tool) for every action that takes a link; a new link tool adds its row here.
 LINK_ACTIONS = [("QR code", "qr")]
+# And for every action that takes a YouTube video's link.
+YOUTUBE_ACTIONS = [("MP3", "mp3"), ("MP4", "mp4")]
 
 
 def build_tools_router() -> Router:
@@ -94,7 +97,7 @@ def first_link(message: Message) -> str | None:
 
 async def show_help(message: Message, settings: Settings, limits: Limits) -> None:
     owner = message.from_user is not None and message.from_user.id == settings.owner_user_id
-    text = HELP.format(limit=limits.download // MB) + (OWNER_HELP if owner else "")
+    text = HELP.format(download=limits.download // MB, upload=limits.upload // MB) + (OWNER_HELP if owner else "")
     await message.answer(f"{text}\n\n{source_notice(settings.source_url)}")
 
 
@@ -108,9 +111,11 @@ def _buttons(message: Message, files: list[Attachment], album: str = "") -> list
         InlineKeyboardButton(text=text, callback_data=FileAction(tool=tool, album=album).pack())
         for text, tool in (FILE_ACTIONS[files[0].kind] if files else [])
     ]
-    if first_link(message) is not None:
+    link = first_link(message)
+    if link is not None:
+        actions = LINK_ACTIONS + (YOUTUBE_ACTIONS if is_youtube_video(link) else [])
         buttons += [
-            InlineKeyboardButton(text=text, callback_data=LinkAction(tool=tool).pack()) for text, tool in LINK_ACTIONS
+            InlineKeyboardButton(text=text, callback_data=LinkAction(tool=tool).pack()) for text, tool in actions
         ]
     return buttons
 
@@ -185,7 +190,9 @@ async def run_file_action(
             await send_docx(bot, source, files[0], limits)
 
 
-async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> None:
+async def run_link_action(
+    query: CallbackQuery, callback_data: LinkAction, limits: Limits, downloads: Downloads, bot: Bot
+) -> None:
     prompt = query.message
     source = prompt.reply_to_message if isinstance(prompt, Message) else None
     link = first_link(source) if source is not None else None
@@ -196,6 +203,8 @@ async def run_link_action(query: CallbackQuery, callback_data: LinkAction) -> No
     match callback_data.tool:
         case "qr":
             await send_qr(source, link)
+        case "mp3" | "mp4":
+            await send_media(bot, source, link, MediaFormat(callback_data.tool), limits, downloads)
 
 
 async def qr_command(message: Message, command: CommandObject) -> None:
@@ -213,5 +222,4 @@ async def send_qr(message: Message, link: str) -> None:
     except ToolError as exc:
         await message.reply(html.escape(str(exc)))
         return
-    caption = url if len(url) <= CAPTION_LIMIT else url[: CAPTION_LIMIT - 1] + "…"
-    await message.reply_photo(BufferedInputFile(png, "qr.png"), caption=html.escape(caption))
+    await message.reply_photo(BufferedInputFile(png, "qr.png"), caption=caption(url))

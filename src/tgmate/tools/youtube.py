@@ -37,6 +37,9 @@ class Media:
     title: str
     uploader: str | None
     duration: int
+    # The video's frame, for players to lay it out before they load it; None for audio.
+    width: int | None = None
+    height: int | None = None
 
     @property
     def file_name(self) -> str:
@@ -129,13 +132,19 @@ class YouTube:
         try:
             fields = json.loads(metadata)
             title, uploader, duration = fields["title"], fields["uploader"], fields["duration"]
-            if not (isinstance(title, str) and isinstance(uploader, str | None) and isinstance(duration, int)):
+            width, height = fields["width"], fields["height"]
+            if not (
+                isinstance(title, str)
+                and isinstance(uploader, str | None)
+                and isinstance(duration, int)
+                and all(isinstance(side, int | None) for side in (width, height))
+            ):
                 raise TypeError(fields)
         except (ValueError, KeyError, TypeError) as exc:
             raise ToolError(sandbox.FAILED) from exc
         if not path.is_file() or path.is_symlink() or path.stat().st_size > max_bytes:
             raise ToolError(sandbox.FAILED)
-        return Media(path, title, uploader, duration)
+        return Media(path, title, uploader, duration, width, height)
 
     # The operation itself, run by the sandbox's worker.
 
@@ -159,8 +168,8 @@ class YouTube:
             with yt_dlp.YoutubeDL(options) as downloader:
                 info = downloader.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
                 cls._check(info, max_bytes)
-                downloader.process_ie_result(info, download=True)
-            return info
+                # The result has the chosen format's details, such as the video's frame.
+                return downloader.process_ie_result(info, download=True)
 
         try:
             try:
@@ -181,10 +190,14 @@ class YouTube:
             size = path.stat().st_size / MB
             raise ToolError(f"The {media_format.upper()} is {size:.0f} MB; the limit is {max_bytes // MB} MB.")
         uploader = info.get("uploader")
+        video = media_format == MediaFormat.MP4
+        width, height = (info.get(side) if video else None for side in ("width", "height"))
         metadata = {
             "title": str(info.get("title") or video_id),
             "uploader": uploader if isinstance(uploader, str) else None,
             "duration": int(info["duration"]),
+            "width": width if isinstance(width, int) else None,
+            "height": height if isinstance(height, int) else None,
         }
         return json.dumps(metadata).encode()
 

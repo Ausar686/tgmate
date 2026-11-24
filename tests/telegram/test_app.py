@@ -1,4 +1,5 @@
 import asyncio
+import pathlib
 
 import pydantic
 import pytest
@@ -13,8 +14,10 @@ from tgmate.telegram.files import MB, Limits
 
 
 async def test_run_migrates_prepares_the_bot_and_polls_for_the_updates_it_handles(
-    settings: Settings, monkeypatch: pytest.MonkeyPatch
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, jobs_dir: pathlib.Path
 ) -> None:
+    # Left by a download a shutdown interrupted.
+    (jobs_dir / "tmp1234").mkdir()
     polling: dict[str, object] = {}
     prepared: list[Settings] = []
 
@@ -30,6 +33,7 @@ async def test_run_migrates_prepares_the_bot_and_polls_for_the_updates_it_handle
     await asyncio.wait_for(app.run(settings), timeout=5)
 
     assert prepared == [settings]
+    assert list(jobs_dir.iterdir()) == []
     assert set(polling["allowed_updates"]) == {"message", "callback_query", "my_chat_member"}
     engine = sa.create_engine(settings.database_url.get_secret_value().replace("+aiosqlite", ""))
     with engine.connect() as connection:

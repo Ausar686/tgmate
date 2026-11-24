@@ -171,7 +171,7 @@ async def test_approved_user_gets_help_and_their_names_are_refreshed(
 
     await dispatcher.feed_update(bot, command_update("/start", full_name=("Alicia", None), username=None))
 
-    assert telegram.sent_texts(USER) == [HELP.format(limit=20) + SOURCE]
+    assert telegram.sent_texts(USER) == [HELP.format(download=20, upload=50) + SOURCE]
     async with sessionmaker() as session:
         user = await session.get(User, USER)
     assert (user.full_name, user.username, user.status) == ("Alicia", None, UserStatus.APPROVED)
@@ -182,7 +182,7 @@ async def test_owner_is_always_allowed_and_never_stored(
 ) -> None:
     await dispatcher.feed_update(bot, command_update("/help", user_id=OWNER))
 
-    assert telegram.sent_texts(OWNER) == [HELP.format(limit=20) + OWNER_HELP + SOURCE]
+    assert telegram.sent_texts(OWNER) == [HELP.format(download=20, upload=50) + OWNER_HELP + SOURCE]
     assert await user_status(sessionmaker, OWNER) is None
 
 

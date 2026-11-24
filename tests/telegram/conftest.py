@@ -1,3 +1,5 @@
+import pathlib
+
 import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -8,7 +10,16 @@ from tests.telegram.fake_api import FakeTelegram
 from tgmate.config import Settings
 from tgmate.storage import db
 from tgmate.storage.models import User, UserStatus
+from tgmate.telegram import youtube
 from tgmate.telegram.app import build_dispatcher
+
+
+@pytest.fixture(autouse=True)
+def jobs_dir(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> pathlib.Path:
+    """YouTube downloads' directory, the test's own and ready, as at startup."""
+    monkeypatch.setattr(youtube, "JOBS_DIR", tmp_path / "jobs")
+    youtube.clear_jobs()
+    return youtube.JOBS_DIR
 
 
 @pytest.fixture

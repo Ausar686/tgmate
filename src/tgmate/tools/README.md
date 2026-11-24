@@ -72,8 +72,9 @@ app), which runs inside the [sandbox](#sandbox) worker.
 max_bytes=2000 MB) -> Media`: one video, downloaded by yt-dlp into the
 caller's `directory` (as `<video id>.mp3` or `.mp4`) inside the
 [sandbox](#sandbox), with a 30-minute timeout. `Media` has the file's path,
-the video's title, uploader and duration, and `file_name`: the title made
-safe as a file name, which front ends save or send the file under.
+the video's title, uploader and duration, its width and height (MP4 only),
+and `file_name`: the title made safe as a file name, which front ends save or
+send the file under.
 - **Links:** only youtube.com (`www`, `m`, `music`) and youtu.be links to a
   single video (`watch?v=`, `shorts/`, `live/`, `embed/`), checked by host and
   an 11-character ID; the download uses the canonical `watch?v=<id>` address,
