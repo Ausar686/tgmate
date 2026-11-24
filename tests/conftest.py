@@ -19,7 +19,7 @@ def in_process_sandbox(request: pytest.FixtureRequest, monkeypatch: pytest.Monke
     is tested in `tests/tools/test_sandbox.py`, marked `real_sandbox`.
     """
     if request.node.get_closest_marker("real_sandbox") is None:
-        monkeypatch.setattr(sandbox, "_execute", worker.handle)
+        monkeypatch.setattr(sandbox, "_execute", lambda request, timeout: worker.handle(request))
 
 
 @pytest.fixture

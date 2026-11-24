@@ -11,6 +11,10 @@ updates:
       # 1.27 has no dependencies at all. Moving to 2.x is a deliberate decision, so only 1.x updates are proposed.
       - dependency-name: pymupdf
         update-types: ["version-update:semver-major"]
+      # Frozen: YouTube breaks yt-dlp often and new releases change behaviour, so it's updated only on request, after
+      # a breakage, to the latest release, checked against the failing link. yt-dlp-ejs is pinned by yt-dlp itself.
+      - dependency-name: yt-dlp
+      - dependency-name: yt-dlp-ejs
     cooldown:
       default-days: 7
     commit-message:

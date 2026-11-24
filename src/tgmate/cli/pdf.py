@@ -18,7 +18,7 @@ def images_to_pdf(
     ],
     output: t.Annotated[
         pathlib.Path | None,
-        typer.Option("--output", "-o", dir_okay=False, help="PDF to write [default: the first image's name, .pdf]."),
+        typer.Option("--output", "-o", dir_okay=False, help="PDF to write (default: the first image's name, .pdf)."),
     ] = None,
     page_size: t.Annotated[
         PageSize, typer.Option(case_sensitive=False, help="Paper to fit each image on, or the image's own size.")
@@ -56,7 +56,7 @@ def pdf_to_docx(
     pdf: t.Annotated[pathlib.Path, typer.Argument(exists=True, dir_okay=False, help="PDF to convert.")],
     output: t.Annotated[
         pathlib.Path | None,
-        typer.Option("--output", "-o", dir_okay=False, help="Document to write [default: the PDF's name, .docx]."),
+        typer.Option("--output", "-o", dir_okay=False, help="Document to write (default: the PDF's name, .docx)."),
     ] = None,
     force: Force = False,
 ) -> None:

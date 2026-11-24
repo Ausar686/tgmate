@@ -10,6 +10,9 @@ services:
       DATABASE_URL: sqlite+aiosqlite:////data/tgmate.db
     volumes:
       - data:/data
+    # Bounds the bot and every worker together: the YouTube worker can't have a per-process memory limit (Deno needs a
+    # huge address space), so a runaway job is stopped here, by the kernel, instead of taking the host's memory.
+    mem_limit: ${BOT_MEMORY_LIMIT:-2g}
     restart: unless-stopped
     stop_grace_period: 30s
     logging:

@@ -11,6 +11,7 @@ uv run tgmate images-to-pdf scan1.jpg scan2.jpg -o scan.pdf
 uv run tgmate pdf-to-jpg scan.pdf -o pages/
 uv run tgmate pdf-to-docx scan.pdf
 uv run tgmate doc-to-pdf report.docx        # needs LibreOffice installed
+uv run tgmate youtube-to-mp3 youtu.be/jNQXAC9IVRw   # needs ffmpeg installed
 uv run tgmate --help                      # all commands
 ```
 

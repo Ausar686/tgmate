@@ -178,3 +178,20 @@ def test_pdf_to_docx_reports_a_refusal(tmp_path: pathlib.Path) -> None:
     assert result.exit_code == 1
     assert result.stderr.strip() == "Error: This isn't a PDF I can read."
     assert not (tmp_path / "report.docx").exists()
+
+
+@pytest.mark.parametrize(
+    ("command", "default"),
+    [
+        ("images-to-pdf", "default: the first image's name, .pdf"),
+        ("pdf-to-docx", "default: the PDF's name, .docx"),
+        ("doc-to-pdf", "default: the document's name, .pdf"),
+        ("youtube-to-mp3", "default: the video's title, .mp3"),
+        ("youtube-to-mp4", "default: the video's title, .mp4"),
+    ],
+)
+def test_output_help_says_what_the_default_name_is(command: str, default: str) -> None:
+    # Square brackets would be read as Rich markup and vanish from the help.
+    result = runner.invoke(app, [command, "--help"], env={"COLUMNS": "200"})
+
+    assert default in plain(result.output)

@@ -9,12 +9,12 @@ import contextlib
 import json
 import logging
 import os
+import pathlib
 import selectors
 import signal
 import struct
 import subprocess  # nosec B404
 import sys
-import tempfile
 import time
 import typing as t
 
@@ -22,6 +22,7 @@ from tgmate.tools.errors import ToolError
 
 log = logging.getLogger(__name__)
 
+# The default for one operation; long ones (downloads) pass their own.
 TIMEOUT_SECONDS = 120
 # The most output read back; a compromised child could otherwise fill the caller's memory.
 MAX_OUTPUT_BYTES = 1024 * 1024 * 1024
@@ -41,6 +42,14 @@ _CHUNK_BYTES = 64 * 1024
 Options = dict[str, str | int]
 
 
+class Request(t.NamedTuple):
+    operation: str
+    options: Options
+    inputs: list[bytes]
+    # The worker sets its CPU limit from it.
+    timeout: float
+
+
 class Result(t.NamedTuple):
     returncode: int
     stdout: bytes
@@ -48,17 +57,22 @@ class Result(t.NamedTuple):
 
 
 def run(
-    operation: str, inputs: t.Sequence[bytes], options: Options, outputs: range, *, workdir: bool = False
+    operation: str,
+    inputs: t.Sequence[bytes],
+    options: Options,
+    outputs: range,
+    *,
+    workdir: pathlib.Path | None = None,
+    timeout: float = TIMEOUT_SECONDS,
 ) -> list[bytes]:
     """The blobs the worker's `operation` returns for `inputs`; raises `ToolError` for anything but a clean result.
 
-    With `workdir`, the operation also gets an empty directory as the `workdir` option. The caller creates and removes
-    it, so it's cleaned up even when the worker is killed.
+    `workdir`, passed to the operation as the `workdir` option, is a directory for files it writes. The caller creates
+    and removes it, so it's cleaned up even when the worker is killed, and can keep what the worker left there.
     """
-    if workdir:
-        with tempfile.TemporaryDirectory(prefix="tgmate-") as directory:
-            return run(operation, inputs, {**options, "workdir": directory}, outputs)
-    result = _execute(encode_request(operation, options, inputs))
+    if workdir is not None:
+        options = {**options, "workdir": str(workdir)}
+    result = _execute(encode_request(Request(operation, options, list(inputs), timeout)), timeout)
     if result.returncode == TOOL_ERROR_STATUS:
         raise ToolError(result.stderr.decode(errors="replace")[:ERROR_CHARS])
     try:
@@ -73,15 +87,15 @@ def run(
     return blobs
 
 
-def encode_request(operation: str, options: Options, inputs: t.Sequence[bytes]) -> bytes:
-    header = json.dumps({"operation": operation, "options": options}).encode()
-    return encode_blobs([header, *inputs])
+def encode_request(request: Request) -> bytes:
+    header = json.dumps({"operation": request.operation, "options": request.options, "timeout": request.timeout})
+    return encode_blobs([header.encode(), *request.inputs])
 
 
-def decode_request(request: bytes) -> tuple[str, Options, list[bytes]]:
-    header, *inputs = decode_blobs(request)
+def decode_request(data: bytes) -> Request:
+    header, *inputs = decode_blobs(data)
     fields = json.loads(header)
-    return fields["operation"], fields["options"], inputs
+    return Request(fields["operation"], fields["options"], inputs, fields["timeout"])
 
 
 def encode_blobs(blobs: t.Iterable[bytes]) -> bytes:
@@ -104,7 +118,7 @@ def decode_blobs(data: bytes) -> list[bytes]:
     return blobs
 
 
-def _execute(request: bytes) -> Result:
+def _execute(request: bytes, timeout: float) -> Result:
     """Run the worker on `request`. Tests swap this for an in-process call to `worker.handle`."""
     # Our own worker module, run with an argument list and no shell. An empty environment: the worker needs no settings
     # and must not hold the bot's token. Its own process group lets a kill reach anything it starts, too.
@@ -117,7 +131,7 @@ def _execute(request: bytes) -> Result:
         start_new_session=True,
     )
     try:
-        stdout, stderr = _communicate(process, request)
+        stdout, stderr = _communicate(process, request, timeout)
     finally:
         _kill(process)
         try:
@@ -128,13 +142,13 @@ def _execute(request: bytes) -> Result:
     return Result(process.returncode, stdout, stderr)
 
 
-def _communicate(process: subprocess.Popen[bytes], request: bytes) -> tuple[bytes, bytes]:
+def _communicate(process: subprocess.Popen[bytes], request: bytes, timeout: float) -> tuple[bytes, bytes]:
     """Feed the worker and read its output until both pipes close, within the timeout and the output limit.
 
     Like `Popen.communicate`, but it stops reading (and the caller kills the worker) past `MAX_OUTPUT_BYTES`, and keeps
     only the tail of stderr.
     """
-    deadline = time.monotonic() + TIMEOUT_SECONDS
+    deadline = time.monotonic() + timeout
     pending = memoryview(request)
     stdout, stderr = bytearray(), b""
     with selectors.DefaultSelector() as selector:
@@ -145,7 +159,7 @@ def _communicate(process: subprocess.Popen[bytes], request: bytes) -> tuple[byte
         while selector.get_map():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise ToolError(f"The conversion took longer than {TIMEOUT_SECONDS} seconds; try a smaller file.")
+                raise ToolError(f"This took longer than {timeout:g} seconds, so I stopped; try something smaller.")
             for key, _ in selector.select(remaining):
                 if key.fileobj is process.stdin:
                     try:
