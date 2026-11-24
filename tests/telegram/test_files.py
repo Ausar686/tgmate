@@ -1,10 +1,14 @@
 import asyncio
 import io
+import pathlib
 import typing as t
 import zipfile
 
 import pytest
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.client.telegram import TelegramAPIServer
+from aiogram.enums import ParseMode
 from aiogram.methods import AnswerCallbackQuery, SendDocument, SendMediaGroup, SendMessage
 from aiogram.types import Chat, InaccessibleMessage, InlineKeyboardMarkup
 from PIL import Image
@@ -17,7 +21,7 @@ from tests.telegram.fake_api import FakeTelegram
 from tests.telegram.updates import USER, callback_update, document, message_data, photo, update, url_entity
 from tgmate.storage.models import UserStatus
 from tgmate.telegram import files
-from tgmate.telegram.files import Albums, FileAction
+from tgmate.telegram.files import MB, Albums, FileAction, Limits
 from tgmate.telegram.tools import ALBUM_GONE, ALBUM_NOT_IMAGES, NOTHING_TO_DO, PROMPT, SOURCE_GONE, LinkAction
 from tgmate.tools.errors import ToolError
 from tgmate.tools.office import Office
@@ -128,7 +132,7 @@ async def test_other_documents_get_pointed_to_help(
 async def test_file_over_the_download_limit_is_refused_before_offering(
     dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:
-    size = files.DOWNLOAD_LIMIT + files.MB // 2
+    size = 20 * MB + MB // 2
 
     await dispatcher.feed_update(bot, update(document=document("doc", size, PDF_TYPE, "big.pdf")))
 
@@ -167,9 +171,9 @@ async def test_image_the_tool_refuses_gets_its_reason(dispatcher: Dispatcher, bo
 
 
 async def test_result_over_the_upload_limit_is_refused(
-    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, monkeypatch: pytest.MonkeyPatch
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:
-    monkeypatch.setattr(files, "UPLOAD_LIMIT", 100)
+    dispatcher["limits"] = Limits(download=20 * MB, upload=100)
 
     await press(dispatcher, bot, "pdf", photo_message(telegram, make_image("JPEG")))
 
@@ -252,10 +256,10 @@ async def test_pdf_the_tool_refuses_gets_its_reason(dispatcher: Dispatcher, bot:
 
 
 async def test_file_grown_past_the_limit_is_refused_when_pressed(
-    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, monkeypatch: pytest.MonkeyPatch
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram
 ) -> None:
     source = document_message(telegram, a_pdf(1), PDF_TYPE, "report.pdf")
-    monkeypatch.setattr(files, "DOWNLOAD_LIMIT", 10)
+    dispatcher["limits"] = Limits(download=10, upload=50 * MB)
 
     await press(dispatcher, bot, "jpg", source)
 
@@ -266,12 +270,12 @@ async def test_file_grown_past_the_limit_is_refused_when_pressed(
 
 @pytest.mark.parametrize(("headroom", "sent"), [(0, True), (-1, False)])
 async def test_upload_limit_applies_to_each_page_not_the_album(
-    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, monkeypatch: pytest.MonkeyPatch, headroom: int, sent: bool
+    dispatcher: Dispatcher, bot: Bot, telegram: FakeTelegram, headroom: int, sent: bool
 ) -> None:
     pdf = a_pdf(3)
     largest = max(map(len, PDF.to_jpegs(pdf)))
     # Below the three pages' total either way.
-    monkeypatch.setattr(files, "UPLOAD_LIMIT", largest + headroom)
+    dispatcher["limits"] = Limits(download=20 * MB, upload=largest + headroom)
 
     await press(dispatcher, bot, "jpg", document_message(telegram, pdf, PDF_TYPE, "report.pdf"))
 
@@ -477,7 +481,7 @@ async def test_album_with_a_file_over_the_download_limit_names_it(
 ) -> None:
     messages = [
         message_data(photo=photo("a", 10), message_id=300, media_group_id="g3"),
-        message_data(photo=photo("b", files.DOWNLOAD_LIMIT + 1), message_id=301, media_group_id="g3"),
+        message_data(photo=photo("b", 20 * MB + 1), message_id=301, media_group_id="g3"),
     ]
 
     await feed_album(dispatcher, bot, messages)
@@ -535,3 +539,23 @@ async def test_album_button_only_works_in_the_chat_it_was_offered_in(albums: Alb
 
     assert albums.get(USER + 1, token) is None
     assert albums.get(USER, token) is not None
+
+
+# --- a local Bot API server ---
+
+
+async def test_with_a_local_server_files_are_read_from_where_it_keeps_them(
+    dispatcher: Dispatcher, tmp_path: pathlib.Path
+) -> None:
+    telegram = FakeTelegram(TelegramAPIServer.from_base("http://bot-api:8081", is_local=True), local_files=tmp_path)
+    bot = Bot("42:TEST", session=telegram, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    # Larger than the hosted Bot API lets bots download.
+    pdf = a_pdf(1) + b"\0" * (20 * MB)
+    dispatcher["limits"] = Limits(download=2000 * MB, upload=2000 * MB)
+
+    await press(dispatcher, bot, "jpg", document_message(telegram, pdf, PDF_TYPE, "report.pdf"))
+
+    assert (tmp_path / "doc").read_bytes() == pdf
+    filename, jpeg = sent_document(telegram)
+    assert filename == "report-1.jpg"
+    assert close_to(Image.open(io.BytesIO(jpeg)).convert("RGB").getpixel((877, 620)), RED)

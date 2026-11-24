@@ -1,8 +1,8 @@
 # Deployment
 
 tgmate's Telegram bot runs as a single container with a SQLite database on a
-Docker volume. The image is built locally from
-[.docker/Dockerfile](../.docker/Dockerfile) and run with
+Docker volume, optionally next to its own Bot API server for large files. The
+images are built locally from [.docker/](../.docker) and run with
 [docker-compose.yaml](../docker-compose.yaml).
 
 ## 1. Create the bot
@@ -50,6 +50,37 @@ for each new user and manages everyone with `/users`. Approved users send a
 link and pick a tool, or use a command; see
 [the bot's README](../src/tgmate/telegram/README.md).
 
+## Own Bot API server
+Telegram's hosted Bot API lets bots receive files up to 20 MB and send up to
+50 MB, too little for most YouTube videos. The bot's own server, in local
+mode, takes both up to 2000 MB. It's the `bot-api` compose service, which
+runs only with the `bot-api` profile and is reachable only by the bot.
+1. At [my.telegram.org](https://my.telegram.org) → **API development
+   tools**, create an application and note its `api_id` and `api_hash`.
+2. In `.env`:
+   ```bash
+   COMPOSE_PROFILES=bot-api
+   TELEGRAM_API_ID=<api_id>
+   TELEGRAM_API_HASH=<api_hash>
+   TELEGRAM_API_URL=http://bot-api:8081
+   ```
+   Optionally raise `DOWNLOAD_LIMIT_MB` (up to 2000) for larger files from
+   users, with `BOT_MEMORY_LIMIT` to match: they're converted in memory.
+3. Stop the bot if it's running, log it out of the hosted Bot API (or
+   Telegram may keep delivering its updates there), and start both
+   services. Once logged out, the bot can't use the hosted Bot API again
+   for 10 minutes.
+   ```bash
+   docker compose build --pull
+   docker compose stop bot
+   docker compose run --rm --no-deps bot python -m tgmate.telegram.logout
+   docker compose up -d
+   ```
+To go back to the hosted Bot API, empty `COMPOSE_PROFILES` and
+`TELEGRAM_API_URL`, then `docker compose up -d --remove-orphans`. The
+server's session and the files it fetched live on the `bot-api` volume;
+TDLib deletes old files on its own.
+
 ## Operations
 - **Restarts:** the service restarts unless stopped. A fatal error, such as
   an invalid token, exits the process so Docker restarts it, backing off
@@ -65,7 +96,10 @@ link and pick a tool, or use a command; see
   ```
 - **Image:** Debian slim with the app in its own venv, no pip, running as an
   unprivileged `tgmate` user. CI builds it, migrates a fresh database inside
-  it, and fails on fixable high or critical vulnerabilities (Trivy).
+  it, and fails on fixable high or critical vulnerabilities (Trivy). The Bot
+  API server's image is aiogram's build of Telegram's server, pinned by
+  digest and run as the same unprivileged user; CI builds, starts and scans
+  it too.
 
 ## Troubleshooting
 - **YouTube downloads fail with "Sign in to confirm you're not a bot"** or

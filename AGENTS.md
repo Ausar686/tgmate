@@ -82,7 +82,8 @@ narration, or dated TODOs. Match the comment density of neighboring code.
 - [tests/](tests) — pytest suite. **See [tests/AGENTS.md](tests/AGENTS.md).**
 - [.docker/](.docker) + [docker-compose.yaml](docker-compose.yaml) — the bot's
   image (uv two-stage build on Debian slim, no pip, non-root, `/data`
-  volume) and its compose service, built locally. CI builds the image,
+  volume) and its compose service, built locally, plus the optional local
+  Bot API server (`bot-api.Dockerfile`, compose profile `bot-api`). CI builds the image,
   migrates a database inside it and fails on fixable high/critical CVEs
   (Trivy). Running it: [docs/deployment.md](docs/deployment.md).
   `.dockerignore` is an allowlist, so new top-level files the build needs

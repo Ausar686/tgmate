@@ -9,6 +9,7 @@ import io
 import pathlib
 import secrets
 import time
+import typing as t
 import zipfile
 
 from aiogram import Bot
@@ -16,14 +17,12 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import BufferedInputFile, InputMediaDocument, Message
 from aiogram.utils.chat_action import ChatActionSender
 
+from tgmate.config import Settings
 from tgmate.tools.errors import ToolError
 from tgmate.tools.office import Office
 from tgmate.tools.pdf import PDF
 
 MB = 1024 * 1024
-# Telegram's hosted Bot API lets bots download files up to 20 MB and send files up to 50 MB.
-DOWNLOAD_LIMIT = 20 * MB
-UPLOAD_LIMIT = 50 * MB
 # Telegram's most files in one album; more pages than this are sent as a ZIP.
 ALBUM_LIMIT = 10
 # Telegram delivers an album as one message per file; it's complete once none has arrived for this long.
@@ -46,6 +45,18 @@ DOCUMENT_TYPES = {
     "application/rtf",
     "text/rtf",
 }
+
+
+@dataclasses.dataclass(frozen=True)
+class Limits:
+    """The largest file, in bytes, the bot takes from users and the largest it sends them."""
+
+    download: int
+    upload: int
+
+    @classmethod
+    def of(cls, settings: Settings) -> t.Self:
+        return cls(settings.download_limit_mb * MB, settings.upload_limit_mb * MB)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -91,18 +102,18 @@ def attachment(message: Message) -> Attachment | None:
     return Attachment(kind, document.file_id, document.file_size, document.file_name)
 
 
-def check_downloadable(files: list[Attachment]) -> None:
-    """Refuse files the Bot API won't let the bot download, before offering or trying to."""
+def check_downloadable(files: list[Attachment], limits: Limits) -> None:
+    """Refuse files over the download limit, before offering or trying to download them."""
     for number, file in enumerate(files, 1):
-        if file.size is not None and file.size > DOWNLOAD_LIMIT:
+        if file.size is not None and file.size > limits.download:
             which = "The file" if len(files) == 1 else f"File {number}"
-            limit = f"I can only take files up to {DOWNLOAD_LIMIT // MB} MB"
+            limit = f"I can only take files up to {limits.download // MB} MB"
             raise ToolError(f"{which} is {file.size / MB:.1f} MB; {limit}.")
 
 
-def check_sendable(size: int) -> None:
-    if size > UPLOAD_LIMIT:
-        raise ToolError(f"The result is {size / MB:.1f} MB; Telegram only lets me send up to {UPLOAD_LIMIT // MB} MB.")
+def check_sendable(size: int, limits: Limits) -> None:
+    if size > limits.upload:
+        raise ToolError(f"The result is {size / MB:.1f} MB; Telegram only lets me send up to {limits.upload // MB} MB.")
 
 
 def stem(name: str | None, default: str) -> str:
@@ -153,55 +164,60 @@ async def download(bot: Bot, file: Attachment) -> bytes:
     return buffer.read()
 
 
-async def send_pdf(bot: Bot, source: Message, images: list[Attachment]) -> None:
+async def send_pdf(bot: Bot, source: Message, images: list[Attachment], limits: Limits) -> None:
     """Reply to `source` with one PDF of the images, or with why it can't be made."""
     async with ChatActionSender.upload_document(source.chat.id, bot):
         try:
-            check_downloadable(images)
+            check_downloadable(images, limits)
             pdf = await asyncio.to_thread(PDF.from_images, [await download(bot, image) for image in images])
-            check_sendable(len(pdf))
+            check_sendable(len(pdf), limits)
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
         await source.reply_document(BufferedInputFile(pdf, f"{stem(images[0].name, 'images')}.pdf"))
 
 
-async def send_document_pdf(bot: Bot, source: Message, document: Attachment) -> None:
+async def send_document_pdf(bot: Bot, source: Message, document: Attachment, limits: Limits) -> None:
     """Reply to `source` with the office document as a PDF, or with why it can't be converted."""
-    await _send_converted(bot, source, document, Office.to_pdf, "pdf")
+    await _send_converted(bot, source, document, limits, Office.to_pdf, "pdf")
 
 
-async def send_docx(bot: Bot, source: Message, pdf: Attachment) -> None:
+async def send_docx(bot: Bot, source: Message, pdf: Attachment, limits: Limits) -> None:
     """Reply to `source` with the PDF as an editable Word document, or with why it can't be converted."""
-    await _send_converted(bot, source, pdf, PDF.to_docx, "docx")
+    await _send_converted(bot, source, pdf, limits, PDF.to_docx, "docx")
 
 
 async def _send_converted(
-    bot: Bot, source: Message, file: Attachment, convert: cabc.Callable[[bytes], bytes], extension: str
+    bot: Bot,
+    source: Message,
+    file: Attachment,
+    limits: Limits,
+    convert: cabc.Callable[[bytes], bytes],
+    extension: str,
 ) -> None:
     """Reply with `convert` of the file, named after it with `extension`, or with the tool's refusal."""
     async with ChatActionSender.upload_document(source.chat.id, bot):
         try:
-            check_downloadable([file])
+            check_downloadable([file], limits)
             result = await asyncio.to_thread(convert, await download(bot, file))
-            check_sendable(len(result))
+            check_sendable(len(result), limits)
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
         await source.reply_document(BufferedInputFile(result, f"{stem(file.name, 'document')}.{extension}"))
 
 
-async def send_jpegs(bot: Bot, source: Message, pdf: Attachment) -> None:
+async def send_jpegs(bot: Bot, source: Message, pdf: Attachment, limits: Limits) -> None:
     """Reply to `source` with the PDF's pages as JPEG files (an album, or a ZIP of more), or with why not."""
     async with ChatActionSender.upload_document(source.chat.id, bot):
         try:
-            check_downloadable([pdf])
+            check_downloadable([pdf], limits)
             pages = await asyncio.to_thread(PDF.to_jpegs, await download(bot, pdf))
             name = stem(pdf.name, "document")
             files = dict(zip(PDF.jpeg_names(name, len(pages)), pages, strict=True))
             archive = await asyncio.to_thread(zip_files, files) if len(files) > ALBUM_LIMIT else None
             # Telegram's limit is per file: the ZIP, or each page sent on its own or in an album.
-            check_sendable(len(archive) if archive is not None else max(map(len, pages)))
+            check_sendable(len(archive) if archive is not None else max(map(len, pages)), limits)
         except ToolError as exc:
             await source.reply(html.escape(str(exc)))
             return
